@@ -1,0 +1,33 @@
+﻿/*
+SW_RBM_A01_C10
+SW_RBM_A01_C10
+SW_RBM_A01_C10
+$projectname$
+$safeprojectname$
+_3097
+*/
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using dmxJson;
+using dmxUserInterface;
+using dmxDataObject;
+using System.Collections;
+using dmxUtils;
+
+public partial class SW_RBM_A01_C10 : uiQuery
+{
+    protected override void Page_Load(object sender, EventArgs e)
+    {
+    	base.isAuthPage = true;
+        base.ProgramID = "A01C10"; // TODO : 修改成這個程式的Program ID , Ex : SW_TestPrj_A01_Q01 --> A01Q01
+        base.Page_Load(sender, e);
+        if (!IsPostBack)
+        { 
+            
+        }
+    }
+}

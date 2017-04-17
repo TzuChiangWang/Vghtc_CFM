@@ -1,0 +1,1242 @@
+﻿/*
+WS_RBM_A01_C10
+
+Description : 研究計畫新增作業
+Create By : 潘姿均
+Create Date : 20150826
+*/
+
+<%@ WebHandler Language="C#" Class="WS_RBM_A01_C10" %>
+
+using System;
+using System.Web;
+using System.Data;
+using System.Text;
+using System.Web.SessionState;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
+using dmxUtils;
+using dmxUserInterface;
+using dmxDataAccess;
+
+public class WS_RBM_A01_C10 : uiAshxCommon
+{
+    public override void ProcessRequest(HttpContext context)
+    {
+        base.ProgramID = "A01C10";
+        base.ProcessRequest(context);
+         //設定回傳頁面型態
+        context.Response.ContentType = "application/json";
+        WebParamaters WPS = new WebParamaters();
+        JavaScriptSerializer js = new JavaScriptSerializer() { MaxJsonLength = Int32.MaxValue };
+        // 設定回傳資料集
+        Dictionary<string, object> dicResult = new Dictionary<string, object>();
+        List<object> listResult = new List<object>();
+        StringBuilder sbSQL = new StringBuilder();
+        DataTable dtTable = new DataTable();
+        string PROJECT_SEQ_NO = "";
+        string sFCode = WPS.getKeys("FCode");
+
+        //判斷登入連線session是否存在
+        if (base.sUserID != "" && base.sUserNM != "")
+        {
+            //協同主持人(院內人士) 取得現有資料
+            if (sFCode == "getDATA")
+            {
+                using (OracleDataSource OraDB = new OracleDataSource("VGHTC.PSADM.ConnStr", true))
+                {
+                    try
+                    {
+                        #region 查詢SQL
+                        sbSQL.AppendLine(@"SELECT 姓名, 卡號, 性別, 生日, EMAIL, 教育程度, 校名, 系別, 到院日期, NVL(離職日期, '0') AS 離職日期, 服務單位代碼 
+                                                    FROM 人事基本資料 
+                                               WHERE 身份證字號 = :IDNO AND  生日 = :MEMBER_BTHDT");
+                        OraDB.SelectCommand = Utils.StrEmpty(sbSQL);
+                        OraDB.SelectParameters.Add("IDNO", context.Request.Form["IDNO"]);
+                        OraDB.SelectParameters.Add("MEMBER_BTHDT", int.Parse(context.Request.Form["MEMBER_BTHDT"]) - 19110000);
+                        #endregion
+
+                        dtTable = OraDB.Select();
+                        if (dtTable.Rows.Count > 0)
+                        {
+                            foreach (DataRow dr in dtTable.Rows)
+                            {
+                                listResult.Add(new JSONClass.JSON_RBM_A02_C10()
+                                {
+                                    MEMBER_NAMEC = dr["姓名"].ToString(),
+                                    MEMBER_SEX = dr["性別"].ToString(),
+                                    MEMBER_BTHDT = (int.Parse(dr["生日"].ToString()) + 19110000).ToString(),
+                                    MEMBER_MOBIL = "",
+                                    MEMBER_EMAIL = dr["EMAIL"].ToString() + "@vghtc.gov.tw",
+                                    MEMBER_ADDRESS = "",
+                                    EDUCATION_LEVEL = dr["教育程度"].ToString(),
+                                    EDUCATION_SCHOOL = dr["校名"].ToString(),
+                                    EDUCATION_DEPARTMENT = dr["系別"].ToString(),
+                                    MEDICAL_BACKGROUND = "",
+                                    WORKING_EXPERIENCE = "",
+                                    SALARY_BEGIN_DATE = "",
+                                    ONBOARD_DATE = (int.Parse(dr["到院日期"].ToString()) + 19110000).ToString(),
+                                    LEAVE_DATE = (int.Parse(dr["離職日期"].ToString()) + 19110000).ToString(),
+                                    MEMBER_BANK_NO = "",
+                                    MEMBER_BANK_ACCOUNT = "",
+                                    ADJUST_SALARY_YN = "",
+                                    MEMBER_DEPT = dr["服務單位代碼"].ToString(),
+                                    MEMBER_CARD_NO = dr["卡號"].ToString()
+                                });
+                            }
+                            dicResult.Add("SRESULT", "TRUE");
+                            dicResult.Add("SMESSAGE", "");
+                            dicResult.Add("DATA", listResult);
+                        }
+                        else
+                        {
+                            dicResult.Add("SRESULT", "TRUE");
+                            dicResult.Add("SMESSAGE", "查無此人");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger ErrLog = new ErrorLogger(base.ProgramID, OraDB.SQL, OraDB.Message);
+                        dicResult.Add("SRESULT", "FALSE");
+                        dicResult.Add("SMESSAGE", ex.Message);
+                    }
+                }
+            }
+            else
+            {
+                using (OracleDataSource OraDB = new OracleDataSource("VGHTC.RBM.ConnStr", true))
+                {
+                    try
+                    {
+                        GetBaseCode gbc = new GetBaseCode();
+                        List<string> ListSELECT = new List<string>();
+                        DBQuery Query = new DBQuery();
+                        DBConnector conn = new DBConnector();
+                        List<DBItem> ITEM = new List<DBItem>();
+                        List<string> ListWHERE = new List<string>();
+                        List<string> ListORDER = new List<string>();
+                        UtlFunction uf = new UtlFunction();
+                        
+                        switch (sFCode)
+                        {
+                            case "C":
+                                {
+                                    string PAPER_YN_V = uf.onoff2YN(context.Request.Form["PAPER_YN"]);
+                                    string sPROJECT_TYPE = context.Request.Form["PROJECT_TYPE"];
+
+                                    ListWHERE.Add("substr(PROJECT_SEQ_NO,0,4) = '" + DateTime.Now.Year.ToString() + "'");
+                                    PROJECT_SEQ_NO = gbc.GetSeqNo("", "PROJECT_MASTER", "PROJECT_SEQ_NO", ListWHERE, GetBaseCode.YearType.AD4, 10, OraDB);
+
+                                    #region 新增資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"INSERT INTO PROJECT_MASTER (PROJECT_SEQ_NO, MASTER_PROJECT_ID, PROJECT_ID, PROJECT_NAMEC, PROJECT_NAME, PROJECT_TYPE, PROJECT_CHILD_TYPE
+                                                                               , PROJECT_TYPE2, BUDGET_YEAR, PROJECT_DEPT, DIRECTOR_NAME
+                                                                               , PROJECT_BEGIN_DATE, PROJECT_END_DATE, INCOME_TYPE, PAPER_YN, PROJECT_STATUS                                                                                    
+                                                                               , USE_FLAG, REMARK, EDU_APPROVE_DTTM, EDU_APPROVE_NAMEC, ACC_APPROVE_DTTM, ACC_APPROVE_NAMEC
+                                                                               , CREATE_DTTM, CREATE_ID, CREATE_NAMEC, LAST_PROC_DTTM, LAST_PROC_ID, LAST_PROC_NAMEC)
+                                                                        VALUES (:PROJECT_SEQ_NO, :MASTER_PROJECT_ID, :PROJECT_ID, :PROJECT_NAMEC, :PROJECT_NAME, :PROJECT_TYPE, :PROJECT_CHILD_TYPE
+                                                                              , :PROJECT_TYPE2, :BUDGET_YEAR, :PROJECT_DEPT, :DIRECTOR_NAME
+                                                                              , :PROJECT_BEGIN_DATE, :PROJECT_END_DATE, :INCOME_TYPE, :PAPER_YN, :PROJECT_STATUS                                                                                    
+                                                                              , :USE_FLAG, :REMARK, to_char(sysdate,'yyyymmddHH24MISS'), :EDU_APPROVE_NAMEC, :ACC_APPROVE_DTTM, :ACC_APPROVE_NAMEC
+                                                                              , to_char(sysdate,'yyyymmddHH24MISS'), :CREATE_ID, :CREATE_NAMEC, to_char(sysdate,'yyyymmddHH24MISS'), :LAST_PROC_ID, :LAST_PROC_NAMEC) ");
+                                    OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.InsertParameters.Add("PROJECT_SEQ_NO", PROJECT_SEQ_NO);
+                                    OraDB.InsertParameters.Add("MASTER_PROJECT_ID", context.Request.Form["MASTER_PROJECT_ID"]);
+                                    OraDB.InsertParameters.Add("PROJECT_ID", context.Request.Form["PROJECT_ID"]);
+                                    OraDB.InsertParameters.Add("PROJECT_NAMEC", context.Request.Form["PROJECT_NAMEC"]);
+                                    OraDB.InsertParameters.Add("PROJECT_NAME", context.Request.Form["PROJECT_NAME"]);
+                                    OraDB.InsertParameters.Add("PROJECT_TYPE", sPROJECT_TYPE);
+                                    OraDB.InsertParameters.Add("PROJECT_CHILD_TYPE", context.Request.Form["PROJECT_CHILD_TYPE"]);
+                                    OraDB.InsertParameters.Add("PROJECT_TYPE2", context.Request.Form["PROJECT_TYPE2"]);
+                                    OraDB.InsertParameters.Add("BUDGET_YEAR", context.Request.Form["BUDGET_YEAR"]);
+                                    OraDB.InsertParameters.Add("PROJECT_DEPT", context.Request.Form["PROJECT_DEPT"]);
+                                    OraDB.InsertParameters.Add("DIRECTOR_NAME", context.Request.Form["DIRECTOR_NAME"]);
+                                    OraDB.InsertParameters.Add("PROJECT_BEGIN_DATE", context.Request.Form["PROJECT_BEGIN_DATE"]);
+                                    OraDB.InsertParameters.Add("PROJECT_END_DATE", context.Request.Form["PROJECT_END_DATE"]);
+                                    OraDB.InsertParameters.Add("INCOME_TYPE", context.Request.Form["INCOME_TYPE"]);
+                                    OraDB.InsertParameters.Add("PAPER_YN", PAPER_YN_V);
+                                    OraDB.InsertParameters.Add("PROJECT_STATUS", sPROJECT_TYPE == "16" ? "30" : "20");
+                                    OraDB.InsertParameters.Add("USE_FLAG", "N");
+                                    OraDB.InsertParameters.Add("REMARK", context.Request.Form["REMARK"]);
+                                    OraDB.InsertParameters.Add("EDU_APPROVE_NAMEC", "研究部");
+                                    OraDB.InsertParameters.Add("ACC_APPROVE_DTTM", sPROJECT_TYPE == "16" ? DateTime.Now.ToString("yyyyMMddHHmmss") : "");
+                                    OraDB.InsertParameters.Add("ACC_APPROVE_NAMEC", sPROJECT_TYPE == "16" ? "歲計組" : "");
+                                    OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.Insert();
+                                    #endregion
+
+                                    #region 新增主持人到PROJECT_HR
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"INSERT INTO PROJECT_HR (   PROJECT_SEQ_NO           ,IDNO                     ,MEMBER_KIND              ,MEMBER_NAMEC             ,MEMBER_BTHDT             ,
+                                                                                    MEMBER_SEX               ,MEMBER_ADDRESS           ,MEMBER_DEPT              ,
+                                                                                    MEMBER_TEL               ,MEMBER_MOBIL             ,MEMBER_EMAIL             ,MEMBER_CARD_NO           ,MEMBER_YEARS             ,
+                                                                                    ONBOARD_DATE             ,PROJECT_BEGIN_DATE       ,PROJECT_END_DATE         ,SALARY_BEGIN_AMT         ,SALARY_APPROVE_AMT       ,
+                                                                                    EDUCATION_LEVEL          ,
+                                                                                    EDUCATION_SCHOOL         ,ADJUST_SALARY_YN         ,
+                                                                                    USE_FLAG                 ,CARD_CHECK_YN            ,
+                                                                                    CREATE_DTTM              ,CREATE_ID                ,CREATE_NAMEC             ,LAST_PROC_DTTM           ,LAST_PROC_ID             ,LAST_PROC_NAMEC          )
+                                                                          SELECT :PROJECT_SEQ_NO AS PROJECT_SEQ_NO, T.PSNIDNO AS IDNO, :MEMBER_KIND AS MEMBER_KIND, T.NAMEC AS MEMBER_NAMEC, '19000000' AS MEMBER_BTHDT 
+                                                                               , 'N' AS MEMBER_SEX, :MEMBER_ADDRESS AS MEMBER_ADDRESS, T.DEPTNO AS MEMBER_DEPT
+                                                                               , :MEMBER_TEL AS MEMBER_TEL, :MEMBER_MOBIL AS MEMBER_MOBIL, :MEMBER_EMAIL AS MEMBER_EMAIL, T.CARDNO AS MEMBER_CARD_NO, :MEMBER_YEARS AS MEMBER_YEARS
+                                                                               , :ONBOARD_DATE AS ONBOARD_DATE, :PROJECT_BEGIN_DATE AS PROJECT_BEGIN_DATE, :PROJECT_END_DATE AS PROJECT_END_DATE, :SALARY_BEGIN_AMT AS SALARY_BEGIN_AMT, :SALARY_APPROVE_AMT AS SALARY_APPROVE_AMT
+                                                                               , :EDUCATION_LEVEL AS EDUCATION_LEVEL
+                                                                               , '' AS EDUCATION_SCHOOL, :ADJUST_SALARY_YN AS ADJUST_SALARY_YN
+                                                                               , :USE_FLAG AS USE_FLAG, 'N' AS CARD_CHECK_YN                                                                           
+                                                                               , to_char(sysdate,'yyyymmddHH24MISS') AS CREATE_DTTM, :CREATE_ID AS CREATE_ID, :CREATE_NAMEC AS CREATE_NAMEC, to_char(sysdate,'yyyymmddHH24MISS') AS LAST_PROC_DTTM, :LAST_PROC_ID AS LAST_PROC_ID, :LAST_PROC_NAMEC AS LAST_PROC_NAMEC                                                                          
+                                                                          FROM PSBASIC T
+                                                                          WHERE CARDNO = :CARDNO");
+                                    OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.InsertParameters.Add("PROJECT_SEQ_NO", PROJECT_SEQ_NO);
+                                    OraDB.InsertParameters.Add("CARDNO", context.Request.Form["DIRECTOR_NAME"]);
+                                    OraDB.InsertParameters.Add("MEMBER_KIND", "10");
+                                    OraDB.InsertParameters.Add("MEMBER_ADDRESS", "台中榮總");
+                                    OraDB.InsertParameters.Add("MEMBER_TEL", "0000");
+                                    OraDB.InsertParameters.Add("MEMBER_MOBIL", "0000");
+                                    OraDB.InsertParameters.Add("MEMBER_EMAIL", "0000");
+                                    OraDB.InsertParameters.Add("MEMBER_YEARS", "0");
+                                    OraDB.InsertParameters.Add("ONBOARD_DATE", "19000000");
+                                    OraDB.InsertParameters.Add("PROJECT_BEGIN_DATE", context.Request.Form["PROJECT_BEGIN_DATE"]);
+                                    OraDB.InsertParameters.Add("PROJECT_END_DATE", context.Request.Form["PROJECT_END_DATE"]);
+                                    OraDB.InsertParameters.Add("SALARY_BEGIN_AMT", 0);
+                                    OraDB.InsertParameters.Add("SALARY_APPROVE_AMT", context.Request.Form["SALARY_APPROVE_AMT"]);
+                                    OraDB.InsertParameters.Add("EDUCATION_LEVEL", "00");
+                                    OraDB.InsertParameters.Add("ADJUST_SALARY_YN", "N");
+                                    OraDB.InsertParameters.Add("USE_FLAG", "N");
+                                    OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.Insert();
+                                    #endregion
+
+                                    if (context.Request.Form["IRB_NO"] != "")
+                                    {
+                                        #region 新增IRB資料表
+                                        sbSQL = new StringBuilder();
+                                        sbSQL.AppendLine(@"INSERT INTO PROJECT_IRB (PROJECT_SEQ_NO, IRB_NO, IRB_APPROVE_STATUS, USE_FLAG
+                                                                        , LAST_PROC_DTTM, LAST_PROC_ID, LAST_PROC_NAMEC, CREATE_DTTM, CREATE_ID, CREATE_NAMEC) 
+                                                                  VALUES (:PROJECT_SEQ_NO, :IRB_NO, :IRB_APPROVE_STATUS, :USE_FLAG
+                                                                        , to_char(sysdate,'yyyymmddHH24MISS'), :LAST_PROC_ID, :LAST_PROC_NAMEC, to_char(sysdate,'yyyymmddHH24MISS'), :CREATE_ID, :CREATE_NAMEC) ");
+
+                                        OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                        OraDB.InsertParameters.Add("PROJECT_SEQ_NO", PROJECT_SEQ_NO);
+                                        OraDB.InsertParameters.Add("IRB_NO", context.Request.Form["IRB_NO"]);
+                                        OraDB.InsertParameters.Add("IRB_APPROVE_STATUS", "30");
+                                        OraDB.InsertParameters.Add("USE_FLAG", "N");
+
+                                        OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                        OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                        OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                        OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                        #endregion
+                                        OraDB.Insert();
+                                    }
+
+                                    uf.Sync_PROJECT_BUDGET_DTL(PROJECT_SEQ_NO, context.Request.Form["PROJECT_TYPE"], "N", base.sUserID, base.sUserNM, OraDB);
+
+                                    OraDB.transaction.Commit();
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "請繼續下一步填寫經費預算。");
+                                    dicResult.Add("DATA", PROJECT_SEQ_NO);         
+                                    break;
+                                }
+                            case "UPDATE_PROJECT_TYPE":
+                                {
+                                    string sPROJECT_SEQ_NO = Utils.StrEmpty(context.Request["PROJECT_SEQ_NO"]);
+                                    string sPROJECT_TYPE = Utils.StrEmpty(context.Request["PROJECT_TYPE"]);
+
+                                    ListWHERE.Add("PROJECT_SEQ_NO = '" + sPROJECT_SEQ_NO + "'");
+                                    string gbcPROJECT_TYPE = gbc.getTableColData("PROJECT_MASTER", "PROJECT_TYPE", ListWHERE, null, GetBaseCode.StrReturnType.error, OraDB);
+
+                                    if (gbcPROJECT_TYPE != sPROJECT_TYPE)
+                                    {
+                                        #region 刪除預算明細表
+                                        sbSQL = new StringBuilder();
+                                        sbSQL.AppendLine(@"DELETE FROM PROJECT_BUDGET_DTL
+                                                                       WHERE PROJECT_SEQ_NO = :PROJECT_SEQ_NO");
+                                        OraDB.DeleteCommand = Utils.StrEmpty(sbSQL);
+                                        OraDB.DeleteParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                        OraDB.Delete();
+                                        #endregion
+
+                                        uf.Sync_PROJECT_BUDGET_DTL(sPROJECT_SEQ_NO, sPROJECT_TYPE, "N", base.sUserID, base.sUserNM, OraDB);
+                                    }
+
+                                    #region 更新資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_MASTER SET  PROJECT_TYPE = :PROJECT_TYPE                     
+                                                   WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("PROJECT_TYPE", context.Request.Form["PROJECT_TYPE"]);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", context.Request.Form["PROJECT_SEQ_NO"]);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    break;
+                                }
+                            case "BUDGET_R":
+                                {
+                                    string sPROJECT_SEQ_NO = Utils.StrEmpty(context.Request["PROJECT_SEQ_NO"]);
+                                    dtTable = gbc.getBudget(sPROJECT_SEQ_NO, "O", null, false, false, "N", OraDB);
+
+                                    foreach (DataRow dr in dtTable.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_RBM_A01_C10_3()
+                                        {
+                                            PROJECT_SEQ_NO = dr["PROJECT_SEQ_NO"].ToString(),
+                                            PROJECT_TYPE = dr["PROJECT_TYPE"].ToString(),
+                                            BUDGET_L_ID = dr["BUDGET_L_ID"].ToString(),
+                                            BUDGET_L_NAMEC = dr["BUDGET_L_NAMEC"].ToString(),
+                                            BUDGET_S_ID = dr["BUDGET_S_ID"].ToString(),
+                                            BUDGET_S_NAMEC = dr["BUDGET_S_NAMEC"].ToString(),
+                                            ACTIVE_BUDGET = dr["ACTIVE_BUDGET"].ToString()
+                                        });
+                                    }
+
+                                    OraDB.transaction.Commit();
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                    break;
+                                }
+                            case "BUDGET_U":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_BATCH_RBM_A01_C10_3>(WPS.getKeys("models"));
+
+                                    for (int i = 0; i < models.models.Count; i++)
+                                    {
+                                        if (models.models[i].ACTIVE_BUDGET == null)
+                                        {
+                                            models.models[i].ACTIVE_BUDGET = "0";
+                                        }
+
+                                        #region 預算變更
+                                        sbSQL = new StringBuilder();
+                                        sbSQL.AppendLine(@"UPDATE PROJECT_BUDGET_DTL SET  ACTIVE_BUDGET              = :ACTIVE_BUDGET             ,
+                                                                                  ACTIVE_BALANCE             = :ACTIVE_BALANCE            ,
+                                                                                  LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                                  LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                                  LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           
+                                                   WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO 
+                                                         AND PROJECT_TYPE = :PROJECT_TYPE AND BUDGET_L_ID = :BUDGET_L_ID AND BUDGET_S_ID = :BUDGET_S_ID ");
+                                        OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                        OraDB.UpdateParameters.Add("ACTIVE_BUDGET", models.models[i].ACTIVE_BUDGET);
+                                        OraDB.UpdateParameters.Add("ACTIVE_BALANCE", models.models[i].ACTIVE_BUDGET);
+                                        OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                        OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+
+                                        OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", models.models[i].PROJECT_SEQ_NO);
+                                        OraDB.UpdateParameters.Add("PROJECT_TYPE", models.models[i].PROJECT_TYPE);
+                                        OraDB.UpdateParameters.Add("BUDGET_L_ID", models.models[i].BUDGET_L_ID);
+                                        OraDB.UpdateParameters.Add("BUDGET_S_ID", models.models[i].BUDGET_S_ID);
+                                        OraDB.Update();
+                                        #endregion
+                                    }
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "更新成功");
+                                    break;
+                                }
+                            case "CHECK_PROJECT_ID":
+                                {
+                                    ListWHERE.Add("PROJECT_ID = '" + context.Request.Form["PROJECT_ID"].ToUpper().Trim().Replace(" ", "") + "'");
+                                    ListWHERE.Add("USE_FLAG = 'Y'");
+
+                                    bool isexist = gbc.CheckDataExist("PROJECT_MASTER", ListWHERE, OraDB);
+                                    if (isexist == true)
+                                    {
+                                        dicResult.Add("SRESULT", "TRUE");
+                                        dicResult.Add("SMESSAGE", "此計畫已存在，請再次確認");
+                                    }
+                                    else
+                                    {
+                                        dicResult.Add("SRESULT", "FALSE");
+                                        dicResult.Add("SMESSAGE", "尚未建立");
+                                    }            
+                                    break;
+                                }
+                            case "get_COM_PROJECT_ID":
+                                {
+                                    /*
+                                        11 : 院外計畫-科技部  CMOST
+                                        12 : 院外計畫-衛福部 CMOHW
+                                        13 : 院外計畫-國衛院 CNHRI
+                                        15 : 院外計畫-其他機構 COTH
+                                        16 : 臨床試驗 CCCT
+                                        17 : 產官學合作 CIOS
+                                    */
+
+                                    string sPROJECT_TYPE_CODE = gbc.getMGTSysCodeNM(base.sSystemID, "01", context.Request.Form["PROJECT_TYPE"], true, OraDB);
+                                    string sBUDGET_YEAR = context.Request["BUDGET_YEAR"];
+
+                                    #region 取值
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@" SELECT :COM_ID || :BUDGET_YEAR || LPAD(NVL(MAX(RPAD(SUBSTR(T.PROJECT_ID,9,4),4)),0)+1, 4, '0000') AS PROJECT_ID                                           
+                                                    FROM PROJECT_MASTER T 
+                                                    WHERE PROJECT_ID LIKE '" + sPROJECT_TYPE_CODE + context.Request.Form["BUDGET_YEAR"] + @"%'
+                                                    ");
+                                    OraDB.SelectCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.SelectParameters.Add("COM_ID", sPROJECT_TYPE_CODE);
+                                    OraDB.SelectParameters.Add("BUDGET_YEAR", sBUDGET_YEAR);
+                                    string PROJECT_ID = OraDB.Select().Rows[0][0].ToString();
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", PROJECT_ID);
+                                    #endregion
+                                    break;
+                                }
+                            case "Complete":
+                                {
+                                    string sPROJECT_SEQ_NO = Utils.StrEmpty(context.Request.Form["PROJECT_SEQ_NO"]);
+                                    #region 更新PROJECT_MASTER資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_MASTER SET USE_FLAG = :USE_FLAG            ,
+                                                                        LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                        LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                        LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           ,
+                                                                        CREATE_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                        CREATE_ID                  = :CREATE_ID                 ,
+                                                                        CREATE_NAMEC               = :CREATE_NAMEC                                                                                       
+                                               WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "Y");
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    #region 更新PROJECT_BUDGET_DTL資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_BUDGET_DTL SET USE_FLAG = :USE_FLAG            ,
+                                                                            LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                            LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                            LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           ,
+                                                                            CREATE_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                            CREATE_ID                  = :CREATE_ID                 ,
+                                                                            CREATE_NAMEC               = :CREATE_NAMEC                                                                                       
+                                                WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "Y");
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    #region 更新PROJECT_HR資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_HR SET USE_FLAG = :USE_FLAG            ,
+                                                                                LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                                LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                                LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           ,
+                                                                                CREATE_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                                CREATE_ID                  = :CREATE_ID                 ,
+                                                                                CREATE_NAMEC               = :CREATE_NAMEC                                                                                       
+                                                    WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "Y");
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    #region 更新PROJECT_IRB資料
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_IRB SET USE_FLAG = :USE_FLAG            ,
+                                                                                LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                                LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                                LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           ,
+                                                                                CREATE_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                                CREATE_ID                  = :CREATE_ID                 ,
+                                                                                CREATE_NAMEC               = :CREATE_NAMEC                                                                                       
+                                                    WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "Y");
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    ListWHERE.Add("PROJECT_SEQ_NO = '" + sPROJECT_SEQ_NO + "'");
+                                    string sPROJECT_ID = gbc.getTableColData("PROJECT_MASTER", "PROJECT_ID", ListWHERE, null, GetBaseCode.StrReturnType.error, OraDB);
+                                    string sPROJECT_TYPE = gbc.getTableColData("PROJECT_MASTER", "PROJECT_TYPE", ListWHERE, null, GetBaseCode.StrReturnType.error, OraDB);
+
+                                    if (sPROJECT_TYPE == "16")
+                                    {
+                                        bool isOK = uf.CUD_IRBROOT("C", sPROJECT_SEQ_NO, sPROJECT_ID, OraDB);
+                                    }
+
+                                    OraDB.transaction.Commit();
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "新增成功");
+                                    break;
+                                }
+                            case "SUPPLIER_C":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A01_C10_2>(WPS.getKeys("models"));
+
+                                    string CONTRACT_AUTOMAIL_YN_V = uf.truefalse2YN(models.CONTRACT_AUTOMAIL_YN);
+
+                                    #region 新增合作廠商
+                                    sbSQL.AppendLine(@"INSERT INTO PROJECT_SUPPLIER ( PROJECT_SEQ_NO, SUPPLIER_ID, SUPPLIER_NAME, SUPPLIER_DIRECTOR, SUPPLIER_CONTACT
+                                                                            , SUPPLIER_TEL, SUPPLIER_FAX, SUPPLIER_EMAIL, CONTRACT_STATUS, CONTRACT_BEGIN_DATE
+                                                                            , CONTRACT_REFUND_DATE, CONTRACT_CONCLUDE_DATE, CONTRACT_BUDGET_LIMIT, CONTRACT_AUTOMAIL_YN, TRIAL_CATEGORY
+                                                                            , TRIAL_CATEGORY_CONTENT, DRUG_LEVEL, DRUG_LEVEL_CONTENT, NATIONAL_FLAG, COUNTRY_NAME
+                                                                            , TAIWAN_DIRECTOR
+                                                                            , USE_FLAG, REMARK
+                                                                            , CREATE_DTTM, CREATE_ID, CREATE_NAMEC, LAST_PROC_DTTM, LAST_PROC_ID, LAST_PROC_NAMEC)
+                                                                    VALUES ( :PROJECT_SEQ_NO, :SUPPLIER_ID, :SUPPLIER_NAME, :SUPPLIER_DIRECTOR, :SUPPLIER_CONTACT
+                                                                            , :SUPPLIER_TEL, :SUPPLIER_FAX, :SUPPLIER_EMAIL, :CONTRACT_STATUS, :CONTRACT_BEGIN_DATE
+                                                                            , :CONTRACT_REFUND_DATE, :CONTRACT_CONCLUDE_DATE, :CONTRACT_BUDGET_LIMIT, :CONTRACT_AUTOMAIL_YN, :TRIAL_CATEGORY
+                                                                            , :TRIAL_CATEGORY_CONTENT, :DRUG_LEVEL, :DRUG_LEVEL_CONTENT, :NATIONAL_FLAG, :COUNTRY_NAME
+                                                                            , :TAIWAN_DIRECTOR
+                                                                            , :USE_FLAG, :REMARK
+                                                                            , to_char(sysdate,'yyyymmddHH24MISS'), :CREATE_ID, :CREATE_NAMEC, to_char(sysdate,'yyyymmddHH24MISS'), :LAST_PROC_ID, :LAST_PROC_NAMEC)");
+                                    OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.InsertParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                    OraDB.InsertParameters.Add("SUPPLIER_ID", models.SUPPLIER_ID);
+                                    OraDB.InsertParameters.Add("SUPPLIER_NAME", models.SUPPLIER_NAME.Trim());
+                                    OraDB.InsertParameters.Add("SUPPLIER_DIRECTOR", models.SUPPLIER_DIRECTOR.Trim());
+                                    OraDB.InsertParameters.Add("SUPPLIER_CONTACT", models.SUPPLIER_CONTACT.Trim());
+                                    OraDB.InsertParameters.Add("SUPPLIER_TEL", models.SUPPLIER_TEL.Trim());
+                                    OraDB.InsertParameters.Add("SUPPLIER_FAX", models.SUPPLIER_FAX.Trim());
+                                    OraDB.InsertParameters.Add("SUPPLIER_EMAIL", models.SUPPLIER_EMAIL.Trim());
+                                    OraDB.InsertParameters.Add("CONTRACT_STATUS", models.CONTRACT_STATUS);
+                                    OraDB.InsertParameters.Add("CONTRACT_BEGIN_DATE", models.CONTRACT_BEGIN_DATE);
+                                    OraDB.InsertParameters.Add("CONTRACT_REFUND_DATE", models.CONTRACT_REFUND_DATE);
+                                    OraDB.InsertParameters.Add("CONTRACT_CONCLUDE_DATE", models.CONTRACT_CONCLUDE_DATE);
+                                    OraDB.InsertParameters.Add("CONTRACT_BUDGET_LIMIT", models.CONTRACT_BUDGET_LIMIT);
+                                    OraDB.InsertParameters.Add("CONTRACT_AUTOMAIL_YN", CONTRACT_AUTOMAIL_YN_V == "" ? "N" : CONTRACT_AUTOMAIL_YN_V);
+                                    OraDB.InsertParameters.Add("TRIAL_CATEGORY", models.TRIAL_CATEGORY);
+                                    OraDB.InsertParameters.Add("TRIAL_CATEGORY_CONTENT", models.TRIAL_CATEGORY_CONTENT.Trim());
+                                    OraDB.InsertParameters.Add("DRUG_LEVEL", Utils.StrEmpty(models.DRUG_LEVEL));
+                                    OraDB.InsertParameters.Add("DRUG_LEVEL_CONTENT", models.DRUG_LEVEL_CONTENT.Trim());
+                                    OraDB.InsertParameters.Add("NATIONAL_FLAG", Utils.StrEmpty(models.NATIONAL_FLAG));
+                                    OraDB.InsertParameters.Add("COUNTRY_NAME", models.COUNTRY_NAME.Trim());
+                                    OraDB.InsertParameters.Add("TAIWAN_DIRECTOR", models.TAIWAN_DIRECTOR.Trim());
+                                    OraDB.InsertParameters.Add("USE_FLAG", "Y");
+                                    OraDB.InsertParameters.Add("REMARK", models.REMARK.Trim());
+                                    OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.Insert();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "新增成功");
+                                    break;
+                                }
+                            case "SUPPLIER_R":
+                                {
+                                    string sPROJECT_SEQ_NO = WPS.getKeys("PROJECT_SEQ_NO");
+                                    string sPROJECT_ID = WPS.getKeys("PROJECT_ID");
+                                    string sSUPPLIER_NAME = WPS.getKeys("SUPPLIER_NAME");
+                                    string sSUPPLIER_ID = WPS.getKeys("SUPPLIER_ID");
+
+                                    StringBuilder sOrderBy = new StringBuilder();
+                                    StringBuilder sQuery = new StringBuilder();
+                                    StringBuilder sSelect = new StringBuilder();
+                                    string sREQ_DT = Utils.StrEmpty(context.Request["sREQ_DT"]);
+                                    string sTX_TYPE = Utils.StrEmpty(context.Request["sTX_TYPE"]);
+                                    var models = js.Deserialize<Constant.JSON_PAGE>(WPS.getKeys("models"));
+
+                                    #region 根據排序傳入的排序 給定row number
+                                    if (models.SORT == null || models.SORT.Count == 0)
+                                    {
+                                        sOrderBy.Append(" T.CONTRACT_BEGIN_DATE DESC");  //default sort
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < models.SORT.Count; i++)
+                                        {
+                                            sOrderBy.Append(models.SORT[i].field);
+                                            sOrderBy.Append(" ");
+                                            sOrderBy.Append(models.SORT[i].dir);
+                                            sOrderBy.Append(",");
+                                        }
+                                    }
+                                    #endregion
+
+                                    #region 查詢條件
+                                    sQuery.Append(@"FROM PROJECT_SUPPLIER T 
+                                                        LEFT OUTER JOIN PROJECT_MASTER S ON T.PROJECT_SEQ_NO = S.PROJECT_SEQ_NO
+                                                        LEFT OUTER JOIN PROJECT_HR W ON S.PROJECT_SEQ_NO = W.PROJECT_SEQ_NO AND S.DIRECTOR_NAME = W.MEMBER_CARD_NO
+				                            WHERE  1 = 1 AND T.USE_FLAG = 'Y' ");
+
+                                    if (!sPROJECT_SEQ_NO.Equals(""))
+                                    {
+                                        sQuery.AppendFormat(" AND T.PROJECT_SEQ_NO like '%{0}%'", sPROJECT_SEQ_NO);
+                                    }
+                                    if (!sPROJECT_ID.Equals(""))
+                                    {
+                                        sQuery.AppendFormat(" AND S.PROJECT_ID = '{0}'", sPROJECT_ID);
+                                    }
+                                    if (!sSUPPLIER_NAME.Equals(""))
+                                    {
+                                        sQuery.AppendFormat(" AND T.SUPPLIER_NAME LIKE '%{0}%'", sSUPPLIER_NAME);
+                                    }
+                                    if (!sSUPPLIER_ID.Equals(""))
+                                    {
+                                        sQuery.AppendFormat(" AND T.SUPPLIER_ID = '{0}'", sSUPPLIER_ID);
+                                    }
+                                    #endregion
+
+                                    #region 權限管控
+                                    if (base.sGroupID == "RBM_ADM")
+                                    {
+
+                                    }
+                                    //臨床試驗(CCT) 群組 可查詢所有 PROJECT_TYPE='16'計畫的資料
+                                    else if (base.sGroupID == "RBM_CCT")
+                                    {
+                                        sQuery.AppendFormat(@" AND S.PROJECT_TYPE = '16'");
+
+                                    }
+                                    //本人相關研究計劃的合作廠商
+                                    else
+                                    {
+                                        sQuery.AppendFormat(@" AND T.PROJECT_SEQ_NO IN (   SELECT DISTINCT T.PROJECT_SEQ_NO FROM PROJECT_MASTER T
+                                                                                    LEFT OUTER JOIN PROJECT_HR S ON T.PROJECT_SEQ_NO = S.PROJECT_SEQ_NO 
+                                                                                    WHERE T.USE_FLAG = 'Y' AND S.USE_FLAG = 'Y' AND S.MEMBER_CARD_NO = '{0}')", base.sUserID);
+                                    }
+                                    #endregion
+
+                                    #region SELECT 欄位
+                                    sSelect.Append(@"SELECT T.* , S.PROJECT_ID, S.PROJECT_NAMEC, W.MEMBER_NAMEC  ");
+                                    #endregion
+
+                                    #region 組SQL
+                                    sbSQL.AppendFormat(@"
+		                                         SELECT *
+		                                          FROM (SELECT ROW_NUMBER() OVER(ORDER BY  {0}) AS RNUM, T.* 
+					                                        FROM (  {1}
+							                                        {2} 
+						                                         ) T
+				                                        )  ", sOrderBy.ToString().TrimEnd(','), sSelect, sQuery);
+
+                                    sbSQL.Append(@" WHERE RNUM BETWEEN :skip + 1 AND :skip + :pagesize");
+
+                                    OraDB.SelectCommand = sbSQL.ToString();
+                                    OraDB.SelectParameters.Add("skip", models.SKIP);
+                                    OraDB.SelectParameters.Add("pagesize", models.PAGESIZE);
+                                    #endregion
+
+                                    DataTable dtData = OraDB.Select();
+                                    if (dtData.Rows.Count > 0)
+                                    {
+                                        foreach (DataRow dr in dtData.Rows)
+                                        {
+                                            listResult.Add(new JSONClass.JSON_RBM_A01_C10_2()
+                                            {
+                                                PROJECT_ID = dr["PROJECT_ID"].ToString() == "" ? dr["PROJECT_NAMEC"].ToString() : dr["PROJECT_NAMEC"].ToString() + "(" + dr["PROJECT_ID"].ToString() + ")",
+                                                PROJECT_SEQ_NO = dr["PROJECT_SEQ_NO"].ToString(),
+                                                SUPPLIER_ID = dr["SUPPLIER_ID"].ToString(),
+                                                SUPPLIER_NAME = dr["SUPPLIER_NAME"].ToString(),
+                                                SUPPLIER_DIRECTOR = dr["SUPPLIER_DIRECTOR"].ToString(),
+                                                SUPPLIER_CONTACT = dr["SUPPLIER_CONTACT"].ToString(),
+                                                SUPPLIER_TEL = dr["SUPPLIER_TEL"].ToString(),
+                                                SUPPLIER_FAX = dr["SUPPLIER_FAX"].ToString(),
+                                                SUPPLIER_EMAIL = dr["SUPPLIER_EMAIL"].ToString(),
+                                                CONTRACT_STATUS = dr["CONTRACT_STATUS"].ToString(),
+                                                CONTRACT_BEGIN_DATE = dr["CONTRACT_BEGIN_DATE"].ToString(),
+                                                CONTRACT_REFUND_DATE = dr["CONTRACT_REFUND_DATE"].ToString(),
+                                                CONTRACT_CONCLUDE_DATE = dr["CONTRACT_CONCLUDE_DATE"].ToString(),
+                                                CONTRACT_BUDGET_LIMIT = dr["CONTRACT_BUDGET_LIMIT"].ToString(),
+                                                CONTRACT_AUTOMAIL_YN = dr["CONTRACT_AUTOMAIL_YN"].ToString(),
+                                                TRIAL_CATEGORY = dr["TRIAL_CATEGORY"].ToString(),
+                                                TRIAL_CATEGORY_CONTENT = dr["TRIAL_CATEGORY_CONTENT"].ToString(),
+                                                DRUG_LEVEL = dr["DRUG_LEVEL"].ToString(),
+                                                DRUG_LEVEL_CONTENT = dr["DRUG_LEVEL_CONTENT"].ToString(),
+                                                NATIONAL_FLAG = dr["NATIONAL_FLAG"].ToString(),
+                                                COUNTRY_NAME = dr["COUNTRY_NAME"].ToString(),
+                                                TAIWAN_DIRECTOR = dr["TAIWAN_DIRECTOR"].ToString(),
+                                                USE_FLAG = dr["USE_FLAG"].ToString(),
+                                                REMARK = dr["REMARK"].ToString(),
+                                                CANCEL_DTTM = dr["CANCEL_DTTM"].ToString(),
+                                                CANCEL_ID = dr["CANCEL_ID"].ToString(),
+                                                CANCEL_NAMEC = dr["CANCEL_NAMEC"].ToString(),
+                                                CREATE_DTTM = dr["CREATE_DTTM"].ToString(),
+                                                CREATE_ID = dr["CREATE_ID"].ToString(),
+                                                CREATE_NAMEC = dr["CREATE_NAMEC"].ToString(),
+                                                LAST_PROC_DTTM = dr["LAST_PROC_DTTM"].ToString(),
+                                                LAST_PROC_ID = dr["LAST_PROC_ID"].ToString(),
+                                                LAST_PROC_NAMEC = dr["LAST_PROC_NAMEC"].ToString(),
+                                                MEMBER_NAMEC = dr["MEMBER_NAMEC"].ToString()
+                                            });
+                                        }
+
+                                        //取得總筆數
+                                        OraDB.SelectCommand = string.Format(@"SELECT COUNT(*) FROM ({0} 
+																{1} 
+															 ) ", sSelect, sQuery);
+                                        dicResult.Add("TOTALCOUNT", OraDB.Select().Rows[0][0].ToString());
+
+                                        dicResult.Add("SRESULT", "TRUE");
+                                        dicResult.Add("SMESSAGE", "");
+                                        dicResult.Add("DATA", listResult);
+                                    }
+                                    else
+                                    {
+                                        dicResult.Add("SRESULT", "FALSE");
+                                        dicResult.Add("SMESSAGE", "查無資料");
+                                    }
+                                    break;
+                                }
+                            case "PROJECT_HR_C":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A04_Q40>(WPS.getKeys("models"));
+
+
+                                    #region PROJECT_HR是否存在
+                                    ListWHERE.Add("MEMBER_CARD_NO = '" + models.MEMBER_CARD_NO.ToUpper() + "'");
+                                    ListWHERE.Add("PROJECT_SEQ_NO = '" + models.PROJECT_SEQ_NO + "'");
+                                    ListWHERE.Add("USE_FLAG = 'Y'");
+                                    bool isExist = gbc.CheckDataExist("PROJECT_HR", ListWHERE, OraDB);
+                                    #endregion
+
+                                    if (isExist == true)
+                                    {
+                                        dicResult.Add("SRESULT", "TRUE");
+                                        dicResult.Add("SMESSAGE", "已存在此計畫相關人員，不需再新增為聯絡人。");
+                                    }
+                                    else
+                                    {
+                                        ListWHERE = new List<string>();
+                                        ListWHERE.Add("LENGTH(IDNO) != 10");
+                                        ListWHERE.Add("PROJECT_SEQ_NO = '" + models.PROJECT_SEQ_NO + "'");
+
+                                        string IDNO = gbc.GetSeqNo("", "PROJECT_HR", "IDNO", ListWHERE, GetBaseCode.YearType.NONE, 6, OraDB);
+
+                                        #region 新增PROJECT_HR
+                                        sbSQL = new StringBuilder();
+                                        sbSQL.AppendLine(@"INSERT INTO PROJECT_HR ( PROJECT_SEQ_NO           ,IDNO                     ,MEMBER_KIND              ,MEMBER_NAMEC             ,MEMBER_BTHDT             ,
+			                                                                MEMBER_SEX               ,MEMBER_ADDRESS           ,MEMBER_DEPT              ,
+			                                                                MEMBER_TEL               ,MEMBER_MOBIL             ,MEMBER_EMAIL             ,MEMBER_CARD_NO           ,MEMBER_YEARS             ,
+			                                                                ONBOARD_DATE             ,PROJECT_BEGIN_DATE       ,PROJECT_END_DATE         ,SALARY_BEGIN_AMT         ,SALARY_APPROVE_AMT       ,
+			                                                                EDUCATION_LEVEL          ,
+			                                                                EDUCATION_SCHOOL         ,CUSTOMER_SERVICE         ,ADJUST_SALARY_YN         ,
+			                                                                USE_FLAG                 ,CARD_CHECK_YN            ,
+			                                                                CREATE_DTTM              ,CREATE_ID                ,CREATE_NAMEC             ,LAST_PROC_DTTM           ,LAST_PROC_ID             ,LAST_PROC_NAMEC   ) 
+	                                                                VALUES (:PROJECT_SEQ_NO           ,:IDNO                     ,:MEMBER_KIND              ,:MEMBER_NAMEC             ,:MEMBER_BTHDT             ,
+			                                                                :MEMBER_SEX               ,:MEMBER_ADDRESS           ,:MEMBER_DEPT              ,                           
+			                                                                :MEMBER_TEL               ,:MEMBER_MOBIL             ,:MEMBER_EMAIL             ,:MEMBER_CARD_NO           ,:MEMBER_YEARS             ,
+			                                                                :ONBOARD_DATE             ,:PROJECT_BEGIN_DATE       ,:PROJECT_END_DATE         ,:SALARY_BEGIN_AMT         ,:SALARY_APPROVE_AMT       ,
+			                                                                :EDUCATION_LEVEL          ,
+			                                                                :EDUCATION_SCHOOL         ,:CUSTOMER_SERVICE         ,:ADJUST_SALARY_YN         ,
+			                                                                :USE_FLAG                 ,:CARD_CHECK_YN            ,
+			                                                                to_char(sysdate,'yyyymmddHH24MISS'), :CREATE_ID, :CREATE_NAMEC, to_char(sysdate,'yyyymmddHH24MISS'), :LAST_PROC_ID, :LAST_PROC_NAMEC)");
+                                        OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                        OraDB.InsertParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                        OraDB.InsertParameters.Add("IDNO", IDNO);
+                                        OraDB.InsertParameters.Add("MEMBER_KIND", models.MEMBER_KIND);
+                                        OraDB.InsertParameters.Add("MEMBER_NAMEC", models.MEMBER_NAMEC);
+                                        OraDB.InsertParameters.Add("MEMBER_BTHDT", "19000000");
+                                        OraDB.InsertParameters.Add("MEMBER_SEX", "N");
+                                        OraDB.InsertParameters.Add("MEMBER_ADDRESS", "台中榮總");
+                                        OraDB.InsertParameters.Add("MEMBER_DEPT", "0000");
+                                        OraDB.InsertParameters.Add("MEMBER_TEL", models.MEMBER_TEL);
+                                        OraDB.InsertParameters.Add("MEMBER_MOBIL", "0000");
+                                        OraDB.InsertParameters.Add("MEMBER_EMAIL", models.MEMBER_EMAIL);
+                                        OraDB.InsertParameters.Add("MEMBER_CARD_NO", models.MEMBER_CARD_NO.ToUpper());
+                                        OraDB.InsertParameters.Add("MEMBER_YEARS", "0");
+                                        OraDB.InsertParameters.Add("ONBOARD_DATE", "19000000");
+                                        OraDB.InsertParameters.Add("PROJECT_BEGIN_DATE", "19000000");
+                                        OraDB.InsertParameters.Add("PROJECT_END_DATE", "19000000");
+                                        OraDB.InsertParameters.Add("SALARY_BEGIN_AMT", 0);
+                                        OraDB.InsertParameters.Add("SALARY_APPROVE_AMT", Utils.StrEmpty(models.SALARY_APPROVE_AMT));
+                                        OraDB.InsertParameters.Add("EDUCATION_LEVEL", "00");
+                                        OraDB.InsertParameters.Add("EDUCATION_SCHOOL", "00");
+                                        OraDB.InsertParameters.Add("CUSTOMER_SERVICE", Utils.StrEmpty(models.CUSTOMER_SERVICE));
+                                        OraDB.InsertParameters.Add("ADJUST_SALARY_YN", "N");
+                                        OraDB.InsertParameters.Add("USE_FLAG", "Y");
+                                        OraDB.InsertParameters.Add("CARD_CHECK_YN", "N");
+                                        OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                        OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                        OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                        OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                        OraDB.Insert();
+                                        #endregion
+
+                                        OraDB.transaction.Commit();
+
+                                        dicResult.Add("SRESULT", "TRUE");
+                                        dicResult.Add("SMESSAGE", "新增成功");
+                                    }
+                                    break;
+                                }
+                            case "PROJECT_HR_R":
+                                {
+                                    string sPROJECT_SEQ_NO = Utils.StrEmpty(context.Request["PROJECT_SEQ_NO"]);
+                                    string sMEMBER_NAMEC = Utils.StrEmpty(context.Request["MEMBER_NAMEC"]);
+                                    string sMEMBER_CARD_NO = Utils.StrEmpty(context.Request["MEMBER_CARD_NO"]);
+
+                                    var models = js.Deserialize<Constant.JSON_PAGE>(WPS.getKeys("models"));
+
+                                    #region 查詢條件
+                                    ListWHERE = new List<string>();
+                                    ListWHERE.Add("T.USE_FLAG ='Y'");
+                                    ListWHERE.Add("T.MEMBER_KIND NOT LIKE '0%'");
+
+                                    if (!sPROJECT_SEQ_NO.Equals(""))
+                                    {
+                                        ListWHERE.Add("T.PROJECT_SEQ_NO like " + conn.Qt("%" + sPROJECT_SEQ_NO + "%"));
+                                    }
+                                    if (!sMEMBER_NAMEC.Equals(""))
+                                    {
+                                        ListWHERE.Add("T.MEMBER_NAMEC like " + conn.Qt("%" + sMEMBER_NAMEC + "%"));
+                                    }
+                                    if (!sMEMBER_CARD_NO.Equals(""))
+                                    {
+                                        ListWHERE.Add("T.MEMBER_CARD_NO = " + conn.Qt(sMEMBER_CARD_NO));
+                                    }
+                                    #endregion
+
+                                    #region 權限管控
+                                    ListWHERE = gbc.ListAuth(base.sGroupID, base.sUserID, ListWHERE, OraDB);
+                                    #endregion
+
+                                    #region 查詢資料集
+                                    ListSELECT = new List<string>();
+                                    ListSELECT.Add("T.PROJECT_SEQ_NO");
+                                    ListSELECT.Add("T.IDNO");
+                                    ListSELECT.Add("T.MEMBER_KIND");
+                                    ListSELECT.Add("T.MEMBER_NAMEC");
+                                    ListSELECT.Add("T.MEMBER_TEL");
+                                    ListSELECT.Add("T.MEMBER_EMAIL");
+                                    ListSELECT.Add("T.MEMBER_CARD_NO");
+                                    #endregion
+                                    dtTable = Query.DBExecQuery("MGT.PROJECT_HR T", ListSELECT, ListWHERE, "T.PROJECT_SEQ_NO ASC", DBQuery.DBQueryType.Paging, models, OraDB);
+
+                                    foreach (DataRow dr in dtTable.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_RBM_A04_Q40()
+                                        {
+                                            PROJECT_SEQ_NO = dr["PROJECT_SEQ_NO"].ToString(),
+                                            IDNO = dr["IDNO"].ToString(),
+                                            MEMBER_KIND = dr["MEMBER_KIND"].ToString(),
+                                            MEMBER_KIND_NM = gbc.getMGTSysCodeNM(base.sSystemID, "10", dr["MEMBER_KIND"].ToString(), false, OraDB),
+                                            MEMBER_NAMEC = dr["MEMBER_NAMEC"].ToString(),
+                                            MEMBER_CARD_NO = dr["MEMBER_CARD_NO"].ToString(),
+                                            MEMBER_TEL = dr["MEMBER_TEL"].ToString(),
+                                            MEMBER_EMAIL = dr["MEMBER_EMAIL"].ToString(),
+                                            PROJECT_ID = gbc.getUniqData(dr["PROJECT_SEQ_NO"].ToString(), "PROJECT_ID", GetBaseCode.StrReturnType.error, OraDB)
+                                        });
+                                    }
+
+                                    //取得總筆數
+                                    dicResult.Add("TOTALCOUNT", Query.DBExecQueryCount("MGT.PROJECT_HR T", ListWHERE, OraDB));
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                    break;
+                                }
+                            case "PROJECT_HR_U":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A04_Q40>(WPS.getKeys("models"));
+
+                                    #region 更新PROJECT_HR
+                                    sbSQL = new StringBuilder();
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_HR SET    MEMBER_NAMEC               = :MEMBER_NAMEC              ,
+                                                                        MEMBER_CARD_NO             = :MEMBER_CARD_NO            ,
+                                                                        MEMBER_KIND                = :MEMBER_KIND               ,
+                                                                        MEMBER_TEL                 = :MEMBER_TEL                ,
+                                                                        MEMBER_EMAIL               = :MEMBER_EMAIL              ,
+                                                                        SALARY_APPROVE_AMT         = :SALARY_APPROVE_AMT        ,                                                                                                                                                                        
+                                                                        CUSTOMER_SERVICE           = :CUSTOMER_SERVICE          ,
+                                                                        LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                        LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                        LAST_PROC_NAMEC            = :LAST_PROC_NAMEC                                                                                                                                                                                                                                                          
+                                               WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO AND IDNO = :IDNO ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("MEMBER_NAMEC", models.MEMBER_NAMEC);
+                                    OraDB.UpdateParameters.Add("MEMBER_CARD_NO", models.MEMBER_CARD_NO);
+                                    OraDB.UpdateParameters.Add("MEMBER_KIND", models.MEMBER_KIND);
+                                    OraDB.UpdateParameters.Add("MEMBER_TEL", models.MEMBER_TEL);
+                                    OraDB.UpdateParameters.Add("MEMBER_EMAIL", models.MEMBER_EMAIL);
+                                    OraDB.UpdateParameters.Add("SALARY_APPROVE_AMT", Utils.StrEmpty(models.SALARY_APPROVE_AMT));
+                                    OraDB.UpdateParameters.Add("CUSTOMER_SERVICE", Utils.StrEmpty(models.CUSTOMER_SERVICE));
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                    OraDB.UpdateParameters.Add("IDNO", models.IDNO);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "更新成功"); 
+                                    break;
+                                }
+                            case "PROJECT_HR_D":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A04_Q40>(WPS.getKeys("models"));
+
+                                    #region 刪除PROJECT_HR
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_HR SET    USE_FLAG                   = :USE_FLAG                  ,
+                                                                        CANCEL_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                        CANCEL_ID                  = :CANCEL_ID                 ,
+                                                                        CANCEL_NAMEC               = :CANCEL_NAMEC           
+                                                   WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO 
+                                                         AND PROJECT_SEQ_NO = :PROJECT_SEQ_NO AND IDNO = :IDNO");
+
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                    OraDB.UpdateParameters.Add("IDNO", models.IDNO);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "N");
+                                    OraDB.UpdateParameters.Add("CANCEL_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CANCEL_NAMEC", base.sUserNM);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "刪除成功");
+                                    break;
+                                }
+                            case "get_CONTRACT_DATE":
+                                {
+                                    string sPROJECT_SEQ_NO = context.Request.Form["PROJECT_SEQ_NO"];
+
+                                    #region 取值
+                                    sbSQL.AppendLine(@"SELECT T.PROJECT_BEGIN_DATE, T.PROJECT_END_DATE 
+                                                   FROM PROJECT_MASTER T
+                                                   WHERE 1 = 1                           
+                                                        AND T.PROJECT_SEQ_NO = :PROJECT_SEQ_NO  ");
+                                    OraDB.SelectCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.SelectParameters.Add("PROJECT_SEQ_NO", sPROJECT_SEQ_NO);
+                                    #endregion
+
+                                    dtTable = OraDB.Select();
+
+                                    foreach (DataRow dr in dtTable.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_RBM_A01_C10()
+                                        {
+                                            PROJECT_BEGIN_DATE = dr["PROJECT_BEGIN_DATE"].ToString(),
+                                            PROJECT_END_DATE = dr["PROJECT_END_DATE"].ToString()
+                                        });
+                                    }
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                    break;
+                                }
+                            case "GET_SUPPLIER":
+                                {
+                                    string sSUPPLIER_NAME = context.Request.Form["SUPPLIER_NAME"];
+
+                                    #region 查詢
+                                    sbSQL.AppendLine(@" SELECT T.SUPPLIER_ID, T.SUPPLIER_NAME, T.SUPPLIER_DIRECTOR, T.SUPPLIER_CONTACT, T.SUPPLIER_TEL, T.SUPPLIER_EMAIL, T.CREATE_DTTM
+                                                FROM PROJECT_SUPPLIER T WHERE SUPPLIER_NAME LIKE :SUPPLIER_NAME
+                                                UNION
+                                                SELECT VAT_NUM AS SUPPLIER_ID, SUPP_NM AS SUPPLIER_NAME, LEADER AS SUPPLIER_DIRECTOR, SALES_NM AS SUPPLIER_CONTACT
+                                                      , PHONE AS SUPPLIER_TEL, EMAIL AS SUPPLIER_EMAIL, '19110101000000' AS CREATE_DTTM
+                                                FROM INV.SUPPLIER_BASIC WHERE SUPP_NM LIKE :SUPPLIER_NAME
+                                                ORDER BY CREATE_DTTM DESC  ");
+                                    OraDB.SelectCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.SelectParameters.Add("SUPPLIER_NAME", "%" + sSUPPLIER_NAME + "%");
+                                    #endregion
+
+                                    dtTable = OraDB.Select();
+                                    foreach (DataRow dr in dtTable.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_RBM_A01_C10_2()
+                                        {
+                                            SUPPLIER_ID = dr["SUPPLIER_ID"].ToString(),
+                                            SUPPLIER_NAME = dr["SUPPLIER_NAME"].ToString(),
+                                            SUPPLIER_DIRECTOR = dr["SUPPLIER_DIRECTOR"].ToString(),
+                                            SUPPLIER_CONTACT = dr["SUPPLIER_CONTACT"].ToString(),
+                                            SUPPLIER_TEL = dr["SUPPLIER_TEL"].ToString(),
+                                            SUPPLIER_EMAIL = dr["SUPPLIER_EMAIL"].ToString()
+                                        });
+                                    }
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                    break;
+                                }
+                            case "GET_PROJECT_ID_PROJECT":
+                                {
+                                    //所有計畫  SELECT LIKE 計畫編號 或 LIKE 主持人姓名 底下的
+                                    string sPROJECT_ID = Utils.StrEmpty(context.Request["PROJECT_ID"]).ToUpper();
+                                    string sPROJECT_NAMEC = Utils.StrEmpty(context.Request["PROJECT_NAMEC"]);
+                                    string sMEMBER_NAMEC = Utils.StrEmpty(context.Request["MEMBER_NAMEC"]);
+                                    string sPROJECT_TYPE = Utils.StrEmpty(context.Request["PROJECT_TYPE"]);
+                                    string sSUPPLIER_NAME = Utils.StrEmpty(context.Request["SUPPLIER_NAME"]);
+
+                                    #region 查詢
+                                    sbSQL.AppendLine(@"SELECT T.PROJECT_SEQ_NO AS PROJECT_SEQ_NO, T.PROJECT_ID AS PROJECT_ID, T.PROJECT_NAMEC AS PROJECT_NAMEC , T.PROJECT_DEPT AS PROJECT_DEPT, T.PROJECT_BEGIN_DATE, T.PROJECT_END_DATE, S.MEMBER_NAMEC
+                                                    FROM PROJECT_MASTER  T
+                                               LEFT OUTER JOIN PROJECT_HR S ON T.PROJECT_SEQ_NO = S.PROJECT_SEQ_NO AND T.DIRECTOR_NAME = S.MEMBER_CARD_NO AND S.MEMBER_KIND = '10'                                                
+                                               LEFT OUTER JOIN PROJECT_SUPPLIER W ON T.PROJECT_SEQ_NO = W.PROJECT_SEQ_NO 
+                                                    WHERE T.USE_FLAG = :USE_FLAG 
+                                                      AND COALESCE(T.PROJECT_ID,' ') LIKE :PROJECT_ID AND T.PROJECT_NAMEC LIKE :PROJECT_NAMEC AND COALESCE(S.MEMBER_NAMEC,' ') LIKE :MEMBER_NAMEC                                                
+                                                      AND T.PROJECT_TYPE LIKE :PROJECT_TYPE AND COALESCE(W.SUPPLIER_NAME,' ') LIKE :SUPPLIER_NAME
+                                               ORDER BY T.CREATE_DTTM DESC");
+                                    OraDB.SelectCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.SelectParameters.Add("USE_FLAG", "Y");
+                                    OraDB.SelectParameters.Add("PROJECT_ID", "%" + sPROJECT_ID + "%");
+                                    OraDB.SelectParameters.Add("PROJECT_NAMEC", "%" + sPROJECT_NAMEC + "%");
+                                    OraDB.SelectParameters.Add("MEMBER_NAMEC", "%" + sMEMBER_NAMEC + "%");
+                                    OraDB.SelectParameters.Add("PROJECT_TYPE", "%" + sPROJECT_TYPE + "%");
+                                    OraDB.SelectParameters.Add("SUPPLIER_NAME", "%" + sSUPPLIER_NAME + "%");
+
+                                    #endregion
+
+                                    dtTable = OraDB.Select();
+                                    foreach (DataRow dr in dtTable.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_RBM_A01_C10_2()
+                                        {
+                                            PROJECT_SEQ_NO = dr["PROJECT_SEQ_NO"].ToString(),
+                                            PROJECT_ID = dr["PROJECT_ID"].ToString() == "" ? dr["PROJECT_NAMEC"].ToString() : dr["PROJECT_ID"].ToString() + " - " + dr["PROJECT_NAMEC"].ToString(),
+                                            MEMBER_NAMEC = dr["MEMBER_NAMEC"].ToString(),
+                                            CONTRACT_BEGIN_DATE = dr["PROJECT_BEGIN_DATE"].ToString(),
+                                            CONTRACT_CONCLUDE_DATE = dr["PROJECT_END_DATE"].ToString()
+                                        });
+                                    }
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                    break;
+                                }
+                            case "SUPPLIER_U":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A01_C10_2>(WPS.getKeys("models"));
+
+                                    #region 更新PROJECT_SUPPLIER
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_SUPPLIER SET  SUPPLIER_NAME              = :SUPPLIER_NAME             ,
+                                                                            SUPPLIER_DIRECTOR          = :SUPPLIER_DIRECTOR         ,
+                                                                            SUPPLIER_CONTACT           = :SUPPLIER_CONTACT          ,
+                                                                            SUPPLIER_TEL               = :SUPPLIER_TEL              ,
+                                                                            SUPPLIER_FAX               = :SUPPLIER_FAX              ,
+                                                                            SUPPLIER_EMAIL             = :SUPPLIER_EMAIL            ,
+                                                                            CONTRACT_STATUS            = :CONTRACT_STATUS           ,
+                                                                            CONTRACT_BEGIN_DATE        = :CONTRACT_BEGIN_DATE       ,
+                                                                            CONTRACT_REFUND_DATE       = :CONTRACT_REFUND_DATE      ,
+                                                                            CONTRACT_CONCLUDE_DATE     = :CONTRACT_CONCLUDE_DATE    ,
+                                                                            CONTRACT_BUDGET_LIMIT      = :CONTRACT_BUDGET_LIMIT     ,
+                                                                            CONTRACT_AUTOMAIL_YN       = :CONTRACT_AUTOMAIL_YN      ,
+                                                                            TRIAL_CATEGORY             = :TRIAL_CATEGORY            ,
+                                                                            TRIAL_CATEGORY_CONTENT     = :TRIAL_CATEGORY_CONTENT    ,
+                                                                            DRUG_LEVEL                 = :DRUG_LEVEL                ,
+                                                                            DRUG_LEVEL_CONTENT         = :DRUG_LEVEL_CONTENT        ,
+                                                                            NATIONAL_FLAG              = :NATIONAL_FLAG             ,
+                                                                            COUNTRY_NAME           = :COUNTRY_NAME          ,
+                                                                            TAIWAN_DIRECTOR            = :TAIWAN_DIRECTOR           ,
+                                                                            USE_FLAG                   = :USE_FLAG                  ,
+                                                                            REMARK                     = :REMARK                    ,
+                                                                            LAST_PROC_DTTM             = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                            LAST_PROC_ID               = :LAST_PROC_ID              ,
+                                                                            LAST_PROC_NAMEC            = :LAST_PROC_NAMEC           
+                                                   WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO 
+                                                         AND SUPPLIER_ID = :SUPPLIER_ID ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_ID", models.SUPPLIER_ID);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_NAME", models.SUPPLIER_NAME);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_DIRECTOR", models.SUPPLIER_DIRECTOR);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_CONTACT", models.SUPPLIER_CONTACT);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_TEL", models.SUPPLIER_TEL);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_FAX", models.SUPPLIER_FAX);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_EMAIL", models.SUPPLIER_EMAIL);
+                                    OraDB.UpdateParameters.Add("CONTRACT_STATUS", models.CONTRACT_STATUS);
+                                    OraDB.UpdateParameters.Add("CONTRACT_BEGIN_DATE", models.CONTRACT_BEGIN_DATE);
+                                    OraDB.UpdateParameters.Add("CONTRACT_REFUND_DATE", models.CONTRACT_REFUND_DATE);
+                                    OraDB.UpdateParameters.Add("CONTRACT_CONCLUDE_DATE", models.CONTRACT_CONCLUDE_DATE);
+                                    OraDB.UpdateParameters.Add("CONTRACT_BUDGET_LIMIT", models.CONTRACT_BUDGET_LIMIT);
+                                    OraDB.UpdateParameters.Add("CONTRACT_AUTOMAIL_YN", models.CONTRACT_AUTOMAIL_YN);
+                                    OraDB.UpdateParameters.Add("TRIAL_CATEGORY", models.TRIAL_CATEGORY);
+                                    OraDB.UpdateParameters.Add("TRIAL_CATEGORY_CONTENT", models.TRIAL_CATEGORY_CONTENT);
+                                    OraDB.UpdateParameters.Add("DRUG_LEVEL", models.DRUG_LEVEL);
+                                    OraDB.UpdateParameters.Add("DRUG_LEVEL_CONTENT", models.DRUG_LEVEL_CONTENT);
+                                    OraDB.UpdateParameters.Add("NATIONAL_FLAG", models.NATIONAL_FLAG);
+                                    OraDB.UpdateParameters.Add("COUNTRY_NAME", models.COUNTRY_NAME);
+                                    OraDB.UpdateParameters.Add("TAIWAN_DIRECTOR", models.TAIWAN_DIRECTOR);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", models.USE_FLAG);
+                                    OraDB.UpdateParameters.Add("REMARK", models.REMARK);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.Update();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "修改成功");
+                                    break;
+                                }
+                            case "SUPPLIER_D":
+                                {
+                                    var models = js.Deserialize<JSONClass.JSON_RBM_A01_C10_2>(WPS.getKeys("models"));
+
+                                    #region 刪除PROJECT_SUPPLIER
+                                    sbSQL.AppendLine(@"UPDATE PROJECT_SUPPLIER SET  USE_FLAG                   = :USE_FLAG                  ,
+                                                                            CANCEL_DTTM                = to_char(sysdate,'yyyymmddHH24MISS')    ,
+                                                                            CANCEL_ID                  = :CANCEL_ID                 ,
+                                                                            CANCEL_NAMEC               = :CANCEL_NAMEC           
+                                                   WHERE PROJECT_SEQ_NO  = :PROJECT_SEQ_NO 
+                                                         AND SUPPLIER_ID = :SUPPLIER_ID ");
+                                    OraDB.UpdateCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.UpdateParameters.Add("PROJECT_SEQ_NO", models.PROJECT_SEQ_NO);
+                                    OraDB.UpdateParameters.Add("SUPPLIER_ID", models.SUPPLIER_ID);
+                                    OraDB.UpdateParameters.Add("USE_FLAG", "N");
+                                    OraDB.UpdateParameters.Add("CANCEL_ID", base.sUserID);
+                                    OraDB.UpdateParameters.Add("CANCEL_NAMEC", base.sUserNM);
+
+                                    #endregion
+                                    OraDB.Update();
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "刪除成功");
+                                    break;
+                                }
+                            case "PROJECT_HR_ADD":
+                                {
+                                    //新增協同主持人
+                                    string ADJUST_SALARY_YN_V = uf.onoff2YN(context.Request.Form["ADJUST_SALARY_YN"]);
+                                    string PART_TIME_KIND = Utils.StrEmpty(context.Request.Form["PART_TIME_KIND"]);
+                                    string PART_TIME_WEEK_HOURS = Utils.StrEmpty(context.Request.Form["PART_TIME_WEEK_HOURS"]);
+
+                                    #region 新增PROJECT_HR
+                                    sbSQL.AppendLine(@"INSERT INTO MGT.PROJECT_HR ( PROJECT_SEQ_NO           ,IDNO                     ,MEMBER_KIND              ,MEMBER_NAMEC             ,MEMBER_BTHDT             ,
+                                                                            MEMBER_SEX               ,MEMBER_BANK_NO           ,MEMBER_BANK_ACCOUNT      ,MEMBER_ADDRESS           ,MEMBER_DEPT              ,
+                                                                            MEMBER_TEL               ,MEMBER_MOBIL             ,MEMBER_EMAIL             ,MEMBER_CARD_NO           ,MEMBER_YEARS             ,
+                                                                            ONBOARD_DATE             ,PROJECT_BEGIN_DATE       ,PROJECT_END_DATE         ,SALARY_BEGIN_AMT         ,
+                                                                            SALARY_APPROVE_AMT       ,SALARY_ADJUST_AMT        ,SALARY_ADJUST_DTTM       ,PART_TIME_KIND           ,PART_TIME_WEEK_HOURS     ,
+                                                                            EDUCATION_LEVEL          ,
+                                                                            EDUCATION_SCHOOL         ,EDUCATION_DEPARTMENT     ,MEDICAL_BACKGROUND       ,WORKING_EXPERIENCE       ,ADJUST_SALARY_YN         ,
+                                                                            USE_FLAG                 ,REMARK                   ,
+                                                                            CREATE_DTTM              ,CREATE_ID                ,CREATE_NAMEC             ,LAST_PROC_DTTM           ,LAST_PROC_ID             ,LAST_PROC_NAMEC          )
+                                                                    VALUES (:PROJECT_SEQ_NO          ,:IDNO                    ,:MEMBER_KIND             ,:MEMBER_NAMEC            ,:MEMBER_BTHDT            ,
+                                                                            :MEMBER_SEX              ,:MEMBER_BANK_NO          ,:MEMBER_BANK_ACCOUNT     ,:MEMBER_ADDRESS          ,:MEMBER_DEPT             ,
+                                                                            :MEMBER_TEL              ,:MEMBER_MOBIL            ,:MEMBER_EMAIL            ,:MEMBER_CARD_NO          ,:MEMBER_YEARS            ,
+                                                                            :ONBOARD_DATE            ,:PROJECT_BEGIN_DATE      ,:PROJECT_END_DATE        ,:SALARY_BEGIN_AMT        ,
+                                                                            :SALARY_APPROVE_AMT      ,:SALARY_ADJUST_AMT       ,:SALARY_ADJUST_DTTM      ,:PART_TIME_KIND          ,:PART_TIME_WEEK_HOURS    ,
+                                                                            :EDUCATION_LEVEL         ,
+                                                                            :EDUCATION_SCHOOL        ,:EDUCATION_DEPARTMENT    ,:MEDICAL_BACKGROUND      ,:WORKING_EXPERIENCE      ,:ADJUST_SALARY_YN        ,
+                                                                            :USE_FLAG                ,:REMARK                  ,
+                                                                            to_char(sysdate,'yyyymmddHH24MISS'), :CREATE_ID, :CREATE_NAMEC, to_char(sysdate,'yyyymmddHH24MISS'), :LAST_PROC_ID, :LAST_PROC_NAMEC)");
+                                    OraDB.InsertCommand = Utils.StrEmpty(sbSQL);
+                                    OraDB.InsertParameters.Add("PROJECT_SEQ_NO", context.Request.Form["PROJECT_SEQ_NO"]);
+                                    OraDB.InsertParameters.Add("IDNO", context.Request.Form["IDNO"]);
+                                    OraDB.InsertParameters.Add("MEMBER_KIND", context.Request.Form["MEMBER_KIND"]);
+                                    OraDB.InsertParameters.Add("MEMBER_NAMEC", context.Request.Form["MEMBER_NAMEC"]);
+                                    OraDB.InsertParameters.Add("MEMBER_BTHDT", context.Request.Form["MEMBER_BTHDT"]);
+                                    OraDB.InsertParameters.Add("MEMBER_SEX", context.Request.Form["MEMBER_SEX"]);
+                                    OraDB.InsertParameters.Add("MEMBER_BANK_NO", "");
+                                    OraDB.InsertParameters.Add("MEMBER_BANK_ACCOUNT", "");
+                                    OraDB.InsertParameters.Add("MEMBER_ADDRESS", context.Request.Form["MEMBER_ADDRESS"]);
+                                    OraDB.InsertParameters.Add("MEMBER_DEPT", context.Request.Form["MEMBER_DEPT"]);
+                                    OraDB.InsertParameters.Add("MEMBER_TEL", "0000");
+                                    OraDB.InsertParameters.Add("MEMBER_MOBIL", context.Request.Form["MEMBER_MOBIL"]);
+                                    OraDB.InsertParameters.Add("MEMBER_EMAIL", context.Request.Form["MEMBER_EMAIL"]);
+                                    OraDB.InsertParameters.Add("MEMBER_CARD_NO", "");
+                                    OraDB.InsertParameters.Add("MEMBER_YEARS", context.Request.Form["MEMBER_YEARS"]);
+                                    OraDB.InsertParameters.Add("ONBOARD_DATE", "19000000");
+                                    OraDB.InsertParameters.Add("PROJECT_BEGIN_DATE", "19000000");
+                                    OraDB.InsertParameters.Add("PROJECT_END_DATE", "19000000");
+                                    OraDB.InsertParameters.Add("SALARY_BEGIN_AMT", 0);
+                                    OraDB.InsertParameters.Add("SALARY_APPROVE_AMT", context.Request.Form["SALARY_APPROVE_AMT"]);
+                                    OraDB.InsertParameters.Add("SALARY_ADJUST_AMT", "");
+                                    OraDB.InsertParameters.Add("SALARY_ADJUST_DTTM", "");
+                                    OraDB.InsertParameters.Add("PART_TIME_KIND", PART_TIME_KIND);
+                                    OraDB.InsertParameters.Add("PART_TIME_WEEK_HOURS", PART_TIME_WEEK_HOURS);
+                                    OraDB.InsertParameters.Add("EDUCATION_LEVEL", context.Request.Form["EDUCATION_LEVEL"]);
+                                    OraDB.InsertParameters.Add("EDUCATION_SCHOOL", context.Request.Form["EDUCATION_SCHOOL"]);
+                                    OraDB.InsertParameters.Add("EDUCATION_DEPARTMENT", context.Request.Form["EDUCATION_DEPARTMENT"]);
+                                    OraDB.InsertParameters.Add("MEDICAL_BACKGROUND", context.Request.Form["MEDICAL_BACKGROUND"]);
+                                    OraDB.InsertParameters.Add("WORKING_EXPERIENCE", context.Request.Form["WORKING_EXPERIENCE"]);
+                                    OraDB.InsertParameters.Add("ADJUST_SALARY_YN", ADJUST_SALARY_YN_V);
+                                    OraDB.InsertParameters.Add("USE_FLAG", "Y");
+                                    OraDB.InsertParameters.Add("REMARK", "");
+                                    OraDB.InsertParameters.Add("CREATE_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("CREATE_NAMEC", base.sUserNM);
+                                    OraDB.InsertParameters.Add("LAST_PROC_ID", base.sUserID);
+                                    OraDB.InsertParameters.Add("LAST_PROC_NAMEC", base.sUserNM);
+                                    OraDB.Insert();
+                                    #endregion
+
+                                    OraDB.transaction.Commit();
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "新增成功");
+                                    break;
+                                }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        OraDB.transaction.Rollback();
+                        if (ex.Message.Substring(0, 9) == "ORA-00001")
+                        {
+                            dicResult.Add("SRESULT", "TRUE");
+                            dicResult.Add("SMESSAGE", "已有此資料");
+                        }
+                        else
+                        {
+                            string content = "操作者卡號：" + base.sUserID + @"<br/>
+                                          操作者：" + base.sUserNM + @"<br/>
+                                          FCode：" + sFCode + @"<br/>
+                                          錯誤例外訊息：" + ex.Message + @"<br/><br/>                                        
+                                          錯誤SQL：" + OraDB.SQL + @"<br/>                                       
+                                          錯誤SQL訊息：" + OraDB.Message + @"<br/>";
+
+                            Utility ut = new Utility();
+                            ut.SendMail("cc4f@vghtc.gov.tw", "melodypan@vghtc.gov.tw", "程式錯誤_" + base.sSystemID + "_" + base.ProgramID, content);
+                            ErrorLogger ErrLog = new ErrorLogger(base.ProgramID, OraDB.SQL, OraDB.Message);
+                            dicResult.Add("SRESULT", "FALSE");
+                            dicResult.Add("SMESSAGE", ex.Message);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            dicResult.Add("SRESULT", "BREAK");
+            dicResult.Add("SMESSAGE", "連線逾時，請重新操作！");
+            dicResult.Add("DATA", "");
+        }
+        // 序列化dicResult
+        string strJSON = js.Serialize(dicResult);
+        context.Response.Write(strJSON);
+        context.Response.End();
+    }
+
+    public override bool IsReusable
+    {
+        get
+        {
+            return false;
+        }
+    }
+    
+}

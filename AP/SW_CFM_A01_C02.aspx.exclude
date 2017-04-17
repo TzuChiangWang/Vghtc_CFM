@@ -1,0 +1,185 @@
+﻿<%@ Page Title="" Language="C#" MasterPageFile="VGHTC_MSTPG.Master" AutoEventWireup="true"
+    CodeFile="SW_CFM_A01_C02.aspx.cs" Inherits="SW_CFM_A01_C02" %>
+
+<asp:Content ID="Content1" ContentPlaceHolderID="cphHeader" runat="Server">
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+
+            var dataSource = new kendo.data.DataSource({
+                transport: {
+                    read: {
+                        url: "../SERVICES/WS_CFM_A02_C02.ashx",
+                        dataType: "json",
+                        type: "POST"//,
+                        //						    data: {
+                        //                                //額外傳至後方的參數
+                        //                                SchoolName: function () {
+                        //                                    return $("#SCHOOL_NAME_TEXT").val();
+                        //                                },
+                        //                                FCode : function(){
+                        //                                return 'R';
+                        //                                }
+                        //                            }
+                    },
+                    create: {
+                        url: "../SERVICES/WS_CFM_A02_C02.ashx",
+                        dataType: "json",
+                        type: "POST",
+                        complete: function (jqXhr, textStatus) {
+                            var result = jQuery.parseJSON(jqXhr.responseText);
+                            alert(result.SMESSAGE);
+                            if (result.SRESULT == "TRUE") {
+                                dataSource.read();
+                            }
+                        }
+
+                    },
+                    update: {
+                        url: "../SERVICES/WS_CFM_A02_C02.ashx",
+                        dataType: "json",
+                        type: "POST",
+                        complete: function (jqXhr, textStatus) {
+                            var result = jQuery.parseJSON(jqXhr.responseText);
+                            alert(result.SMESSAGE);
+                            if (result.SRESULT == "TRUE") {
+                                dataSource.read();
+                            }
+                        }
+                    },
+                    parameterMap: function (options, operation) {
+                        if (operation == "read") {
+                            return {
+                                FCode: "R",
+                                SchoolName: $("#SCHOOL_NAME_TEXT").val(),
+                                models: kendo.stringify(options)
+                            }
+                        }
+                        else {
+                            var Fcode;
+                            switch (operation) {
+                                case "update": Fcode = "U";
+                                    break;
+                                case "create": Fcode = "C";
+                                    break;
+                            }
+                            return {
+                                FCode: Fcode,
+                                models: kendo.stringify(options)
+                            }
+                        }
+                    }
+                },
+                schema: {
+                    type: 'json',
+                    data: 'DATA',
+                    total: function (d) { return d.TOTALCOUNT; },
+                    model: {
+                        id: "SCHOOL_ID",
+                        fields: {
+                            SCHOOL_ID: { editable: true, type: "string", validation: { required: true } },
+                            SCHOOL_NAME: { editable: true, type: "string", validation: { required: true } },
+                            PROCDATETIME: { editable: false, type: "string" },
+                            PROCID: { editable: false, type: "string" },
+                            PROCNMC: { editable: false, type: "string" }
+                        }
+                    }
+                },
+                pageSize: 10,
+                serverPaging: true,//使用server端的分頁，點選分頁將會重新綁定DataSoure給Grid
+                serverSorting: true//使用server端的排序，點選排序將會重新綁定DataSoure給Grid
+            });
+
+            $("#QueryButton").click(function () {
+                dataSource.read();
+            });
+
+            $("#ListGrid").kendoGrid({
+                dataSource: dataSource,
+                height: 520,
+                selectable: true,
+                resizable: true,
+                sortable: {
+                    mode: "multiple",
+                    allowUnsort: false
+                },
+                pageable: {
+                    pageSizes: true,
+                    buttonCount: 5
+                },
+                columns: [
+			        { command: [{ name: "edit", text: "修改" }], width: 70 },
+			        { field: "SCHOOL_ID", title: "學校代碼", width: 70 },
+			        { field: "SCHOOL_NAME", title: "學校名稱", width: 70 },
+			        { field: "PROCDATETIME", title: "修改時間", width: 70 },
+			        { field: "PROCID", title: "修改人員ID", width: 70 },
+			        { field: "PROCNMC", title: "修改人員姓名", width: 70 }
+                ],
+                editable: {
+                    mode: "popup", //使用Popup的模式編輯資料
+                    update: true, // 若設定為True,當按下Update即更新server資料
+                    window: {
+                        width: 600
+                    }
+                },
+                edit: function (e) {
+                    if (!e.model.isNew()) {
+                        //編輯
+                        var numeric = e.container.find("input[name=SCHOOL_ID]").attr('readonly', 'true');
+
+                        $('.k-grid-update').text('更新');
+                        $('.k-grid-cancel').text('返回');
+                        $('.k-window-title').text('編輯');
+                    }
+                    else {
+                        //新增
+                        // hide name column
+                        e.container.find('.k-edit-label:nth-child(5)').hide();
+                        e.container.find('.k-edit-field:nth-child(6)').hide();
+                        e.container.find('.k-edit-label:nth-child(7)').hide();
+                        e.container.find('.k-edit-field:nth-child(8)').hide();
+                        e.container.find('.k-edit-label:nth-child(9)').hide();
+                        e.container.find('.k-edit-field:nth-child(10)').hide();
+
+                        //新增
+                        $('.k-grid-update').text('確定');
+                        $('.k-grid-cancel').text('取消');
+                        $('.k-window-title').text('新增');
+                    }
+                },
+                toolbar: [
+                        {
+                            text: "新增資料",
+                            name: "create",
+                            iconClass: "k-icon k-add"
+                        }
+                ]
+            });
+
+        });
+    </script>
+
+</asp:Content>
+<asp:Content ID="Content2" ContentPlaceHolderID="cphMain" runat="Server">
+    <table class="table" style="width: 100%;">
+        <tbody>
+            <tr>
+                <td style="border-top-width: 0px; border-top-style: none;">
+                    <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                        <span class="input-group-addon">學校名稱</span>
+                        <input class="form-control" id="SCHOOL_NAME_TEXT" type="text" />
+                    </div>
+                    <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="left: 0px; top: 0px; width: 122px; height: 25px; margin-top: 2px; margin-left: 10px;">
+                        <button type="button" tabindex="0" class="k-primary  k-button k-button-icontext"
+                            id="QueryButton">
+                            <span class="k-sprite k-icon k-i-search"></span>確定</button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div style="width: 100%">
+        <div id="ListGrid">
+        </div>
+    </div>
+</asp:Content>

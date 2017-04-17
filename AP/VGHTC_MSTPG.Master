@@ -1,0 +1,119 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeFile="VGHTC_MSTPG.Master.cs" Inherits="VGHTC_MSTPG" %>
+
+<!DOCTYPE html>
+<html>
+<head runat="server">
+    <title></title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <!-- KENDO UI CSS -->
+    <link href="../CSS/kendo.common.min.css" rel="stylesheet" />
+    
+    <!-- BOOTSTRAP AND SHARED CSS -->
+    <link href="../CSS/style.css" rel="stylesheet" />
+    <link href="../CSS/customized.css" rel="stylesheet" />
+    <link href="../CSS/kendo.bootstrap.min.css" rel="stylesheet" />
+    <!-- SHARED JS -->
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.min.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/bootstrap.min.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.blockUI.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.maskedinput.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.ui.core.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.validate.min.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/jquery.vghtc.js"></script>
+
+    <script type="text/javascript" src="../JAVASCRIPT/date.format.js"></script>    
+    <!-- KENDO UI JS -->
+    <script type="text/javascript" src="../JAVASCRIPT/kendo.all.min.js"></script>
+    <script type="text/javascript" src="../JAVASCRIPT/jszip.min.js"></script>
+    <script type="text/javascript" src="../JAVASCRIPT/moment.min.js"></script>
+    <script type="text/javascript" src="../JAVASCRIPT/EDUCommJavaScript.js"></script>
+
+    <!--<script type="text/javascript" src="http://www.solasmusic.com/js/kendo/kendo.all.js"></script>-->
+
+    <!--[if lt IE 9]>
+      <script src="../JAVASCRIPT/html5shiv.js"></script>
+    <![endif]-->
+
+    <script type="text/javascript" src="../JAVASCRIPT/function.js"></script>
+
+    <script type="text/javascript">       
+        $(function () {
+            $('#kendomenu').kendoMenu();
+        });       
+        ////add by isabella 是否為單位管理者權限
+        //var isDeptManager=false;//預設非單位管理者或管理者
+        //var PersonState;
+        //    $.ajax({
+        //    type: "POST", //表單method
+        //    async: false,
+        //    url: "../SERVICES/WS_EDU_Shared.ashx",
+        //    data: { FCode: "GetPersonState" },
+        //    complete: function (jqXhr, textStatus) {
+        //        var result = jQuery.parseJSON(jqXhr.responseText);
+        //        if (result.SRESULT == "TRUE") {
+        //            PersonState = result.PerState;
+        //        }
+        //    }
+        //});
+         
+        //$.ajax({
+        //    url: "../SERVICES/WS_EDU_Shared.ashx?FCode=isDeptManager",
+        //    type: "post",
+        //    dataType: 'json',
+        //    async: false,
+        //    success: function (e) {
+        //        if (e.SRESULT == "TRUE") {                  
+        //                isDeptManager = e.DATA;                    
+        //        }
+        //    }
+        //});
+
+    </script>
+
+    <asp:ContentPlaceHolder ID="cphHeader" runat="server">
+    </asp:ContentPlaceHolder>
+</head>
+<body>
+    <div id="container">
+        <iframe id="fresh" src="SW_CFM_KeepSession.ASPX" style="width: 0px; height: 0px; display: none;"></iframe>
+        <form id="form1" runat="server" class="form-horizontal" role="form">
+            <div class="container">
+                <div id="header">
+                    <div id="system">
+                        系統名稱：<span>
+                            <%=sSystemNM %>(<%=sSystemID %>)</span> 使用者：<span>
+                                <%=sUserNM %>(<%=sUserID %>)</span>
+                       
+                    </div>
+                    <div id="function">
+                        <asp:LinkButton ID="lbHome" runat="server" ForeColor="#FFFF99" PostBackUrl="SW_CFM_A01_C01.ASPX"
+                            CausesValidation="False" Text="[ 回首頁 ]" />&nbsp;<asp:LinkButton ID="lbLogout" runat="server"
+                                ForeColor="#FFFF99" OnClick="lbLogout_Click" CausesValidation="False" Text="[ 登出 ]" />
+                    </div>
+                </div>
+                <div id="menu">
+                    <asp:Literal ID="liMenu" runat="server" />
+                </div>
+                <div id="navigation">
+                    <asp:Label ID="lblProgName" runat="server" Font-Bold="True" ForeColor="Silver" />
+                </div>
+                <div id="programcomment">
+                    <span style="background: #0099FF; color: #FFF; padding: 10px;">程式操作說明</span>
+                    <asp:Label ID="liProgComment" runat="server" Style="letter-spacing: 2px;" />
+                </div>
+                <div id="body">
+                    <asp:ContentPlaceHolder ID="cphMain" runat="server">
+                    </asp:ContentPlaceHolder>
+                </div>
+            </div>
+        </form>
+    </div>   
+</body>
+</html>

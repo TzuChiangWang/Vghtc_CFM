@@ -1,0 +1,32 @@
+﻿/*
+SW_MEM_A01_M000
+
+Description : mgtcode維護
+Create By : zih-jyun pan
+Create Date : 20151105
+*/
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using dmxJson;
+using dmxUserInterface;
+using dmxDataObject;
+using System.Collections;
+using dmxUtils;
+
+public partial class SW_SYS_A01_M000 : uiQuery
+{
+    protected override void Page_Load(object sender, EventArgs e)
+    {
+    	base.isAuthPage = true;
+        base.ProgramID = "A01M000"; // TODO : 修改成這個程式的Program ID , Ex : SW_TestPrj_A01_Q01 --> A01Q01
+        base.Page_Load(sender, e);
+        if (!IsPostBack)
+        { 
+            
+        }
+    }
+}

@@ -1,0 +1,207 @@
+﻿/*
+SW_CFM_A02_C02
+
+Description : 學校代碼維護
+Create By : 菜菜
+Create Date : 20150626
+*/
+
+<%@ WebHandler Language="C#" Class="WS_CFM_A01_C02" %>
+
+using System;
+using System.Web;
+using System.Data;
+using System.Text;
+using System.Web.SessionState;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
+using dmxUtils;
+using dmxUserInterface;
+using dmxDataAccess;
+
+public class WS_CFM_A01_C02 : uiAshxCommon
+{
+    public override void ProcessRequest(HttpContext context)
+    {
+        base.ProgramID = "A01C01";
+        base.ProcessRequest(context);
+        // 設定回傳頁面型態
+        context.Response.ContentType = "application/json";
+        WebParamaters WPS = new WebParamaters();
+        JavaScriptSerializer js = new JavaScriptSerializer() { MaxJsonLength = Int32.MaxValue };
+        // 設定回傳資料集
+        Dictionary<string, object> dicResult = new Dictionary<string, object>();
+        List<object> listResult = new List<object>();
+        StringBuilder sbSQL = new StringBuilder();
+        string sFCode = WPS.getKeys("FCode");
+
+        //判斷登入連線session是否存在
+        if (base.sUserID != "" && base.sUserNM != "")
+        {
+            using (OracleDataSource OraDB = new OracleDataSource("VGHTC.EDU.ConnStr"))
+            {
+                try
+                {
+                    switch (sFCode)
+                    {
+                        case "C":
+                            {
+                                var models = js.Deserialize<JSONClass.JSON_CFM_A01_C02>(WPS.getKeys("models"));
+                                OraDB.InsertCommand = @"
+                            INSERT INTO OPDUSR.BASCODE (SYSTEMID,SYSCODETYPE,HISSYSCODE,HISSYSCODENM,PROCDATETIME,PROCID,PROCNMC,CREATEDATETIME,CREATEID,CREATENMC)
+                            VALUES('EDUPRJ','01',:HISSYSCODE,:HISSYSCODENM,TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS'),:PROCID,:PROCNMC,TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS'),:CREATEID,:CREATENMC)";
+
+                                OraDB.InsertParameters.Add("HISSYSCODE", models.SCHOOL_ID);
+                                OraDB.InsertParameters.Add("HISSYSCODENM", models.SCHOOL_NAME);
+                                OraDB.InsertParameters.Add("PROCID", base.sUserID);
+                                OraDB.InsertParameters.Add("PROCNMC", base.sUserNM);
+                                OraDB.InsertParameters.Add("CREATEID", base.sUserID);
+                                OraDB.InsertParameters.Add("CREATENMC", base.sUserNM);
+
+                                OraDB.Insert();
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "新增成功");
+                                break;
+                            }
+                        case "R":
+                            {
+                                StringBuilder sOrderBy = new StringBuilder();
+                                StringBuilder sQuery = new StringBuilder();
+                                string sSchoolName = Utils.StrEmpty(context.Request["SchoolName"]);
+                                var models = js.Deserialize<JSONClass.JSON_EDU_PAGE>(WPS.getKeys("models"));
+
+                                //欄位名稱轉換成DB名稱
+                                Dictionary<string, string> dicMap = new Dictionary<string, string>();
+                                dicMap.Add("SCHOOL_ID", "HISSYSCODE");
+                                dicMap.Add("SCHOOL_NAME", "HISSYSCODENM");
+
+                                #region 根據排序傳入的排序 給定row number
+                                if (models.SORT == null)
+                                {
+                                    sOrderBy.Append("HISSYSCODE ASC");  //default sort
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < models.SORT.Count; i++)
+                                    {
+                                        if (dicMap.ContainsKey(models.SORT[i].field))
+                                            models.SORT[i].field = dicMap[models.SORT[i].field];
+                                        sOrderBy.Append(models.SORT[i].field);
+                                        sOrderBy.Append(" ");
+                                        sOrderBy.Append(models.SORT[i].dir);
+                                        sOrderBy.Append(",");
+                                    }
+                                }
+                                #endregion
+
+                                #region 查詢條件
+                                sQuery.Append(@"
+                                      FROM OPDUSR.BASCODE T
+                                     WHERE T.SYSTEMID = 'EDUPRJ'
+                                       AND T.SYSCODETYPE = '01' ");
+                                if (!sSchoolName.Equals(""))
+                                {
+                                    sQuery.AppendFormat("AND T.HISSYSCODENM like '%{0}%'", sSchoolName);
+                                }
+                                #endregion
+
+                                #region 組SQL
+                                sbSQL.AppendFormat(@"
+                            SELECT *
+                              FROM (SELECT ROW_NUMBER() OVER(ORDER BY {0}) AS RNUM,
+                                           T.HISSYSCODE SCHOOL_ID,
+                                           T.HISSYSCODENM SCHOOL_NAME,
+                                           TO_CHAR(TO_DATE(T.PROCDATETIME, 'YYYYMMDDHH24MISS'),
+                                                   'YYYY/MM/DD HH24:MI') PROCDATETIME,
+                                           T.PROCID,
+                                           T.PROCNMC
+                            {1}    ", sOrderBy.ToString().TrimEnd(','), sQuery.ToString());
+
+                                sbSQL.Append(@") WHERE RNUM BETWEEN :skip + 1 AND :skip + :pagesize");
+
+                                OraDB.SelectCommand = sbSQL.ToString();
+                                OraDB.SelectParameters.Add("skip", models.SKIP);
+                                OraDB.SelectParameters.Add("pagesize", models.PAGESIZE);
+                                #endregion
+
+                                DataTable dtData = OraDB.Select();
+                                if (dtData.Rows.Count > 0)
+                                {
+                                    foreach (DataRow dr in dtData.Rows)
+                                    {
+                                        listResult.Add(new JSONClass.JSON_CFM_A01_C02()
+                                        {
+                                            SCHOOL_ID = dr["SCHOOL_ID"].ToString(),
+                                            SCHOOL_NAME = dr["SCHOOL_NAME"].ToString(),
+                                            PROCDATETIME = dr["PROCDATETIME"].ToString(),
+                                            PROCID = dr["PROCID"].ToString(),
+                                            PROCNMC = dr["PROCNMC"].ToString()
+                                        });
+                                    }
+
+                                    //取得總筆數
+                                    OraDB.SelectCommand = string.Format("SELECT COUNT(*) {0} ", sQuery);
+                                    dicResult.Add("TOTALCOUNT", OraDB.Select().Rows[0][0].ToString());
+
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "");
+                                    dicResult.Add("DATA", listResult);
+                                }
+                                else
+                                {
+                                    dicResult.Add("SRESULT", "TRUE");
+                                    dicResult.Add("SMESSAGE", "查無資料");
+                                }
+                                break;
+                            }
+                        case "U":
+                            {
+                                var models = js.Deserialize<JSONClass.JSON_CFM_A01_C02>(WPS.getKeys("models"));
+                                OraDB.UpdateCommand = @"
+                            UPDATE OPDUSR.BASCODE T
+                               SET T.HISSYSCODENM = :HISSYSCODENM,
+                                   T.PROCDATETIME = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+                                   T.PROCID       = :PROCID,
+                                   T.PROCNMC      = :PROCNMC
+                             WHERE T.SYSTEMID = 'EDUPRJ'
+                               AND T.SYSCODETYPE = '01'
+                               AND T.HISSYSCODE = :HISSYSCODE ";
+                                OraDB.UpdateParameters.Add("HISSYSCODENM", models.SCHOOL_NAME);
+                                OraDB.UpdateParameters.Add("PROCID", base.sUserID);
+                                OraDB.UpdateParameters.Add("PROCNMC", base.sUserNM);
+                                OraDB.UpdateParameters.Add("HISSYSCODE", models.SCHOOL_ID);
+
+                                OraDB.Update();
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "更新成功");
+                                break;
+                            }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string content = "操作者卡號：" + base.sUserID + @"<br/>
+                                      操作者：" + base.sUserNM + @"<br/>
+                                      錯誤例外訊息：" + ex.Message + @"<br/><br/>                                        
+                                      錯誤SQL：" + OraDB.SQL + @"<br/>                                       
+                                      錯誤SQL訊息：" + OraDB.Message + @"<br/>";
+                    Utility ut = new Utility();
+                    //ut.SendMail("cc4f@vghtc.gov.tw", "cc4f@vghtc.gov.tw", "程式錯誤_" + base.sSystemID + "_" + base.ProgramID, content);
+                    //ErrorLogger ErrLog = new ErrorLogger(base.ProgramID, OraDB.SQL, OraDB.Message);
+                    dicResult.Add("SRESULT", "FALSE");
+                    dicResult.Add("SMESSAGE", ex.Message);
+                }
+            }
+        }
+        else
+        {
+            dicResult.Add("SRESULT", "BREAK");
+            dicResult.Add("SMESSAGE", "連線逾時，請重新操作！");
+            dicResult.Add("DATA", "");
+        }
+        // 序列化dicResult
+        string strJSON = js.Serialize(dicResult);
+        context.Response.Write(strJSON);
+        context.Response.End();
+    }
+}

@@ -1,0 +1,2025 @@
+﻿<%@ Page Title="" Language="C#" MasterPageFile="VGHTC_MSTPG.Master" AutoEventWireup="true" CodeFile="SW_RBM_A01_C10.aspx.cs" Inherits="SW_RBM_A01_C10" %>
+
+<asp:Content ID="Content1" ContentPlaceHolderID="cphHeader" runat="Server">
+    <script type="text/javascript">
+        $(document).ready(function () {
+            var PROJECT_SEQ_NO = "";
+            var PROJECT_ID = "";
+
+            ini_BUDGET_Grid();
+            ini_PROJECT_HR_Grid();
+            ini_SUPPLIER_Grid();
+            ini_kendo();
+            ini_kendowindow();
+            ini_ADD_PROJECT();
+
+            btn_GET_DIRECTOR_NAME();
+            btn_PROJECT_SEQ_NO();
+            btn_GET_INV_SUPPLIER();
+            
+            var dataSource_PROJECT_SEQ_NO;
+            var dataSource_PROJECT_HR;
+            var dataSource_INV_SUPPLIER;
+            var dataSource_BUDGET
+            var DIRECTOR_NAME_wnd, PROJECT_SEQ_NO_wnd, INV_SUPPLIER_wnd, window, completemsg;
+
+            function ini_kendo(){
+
+                $('#PROJECT_IDText').bind('change', function () {
+                    if ($("#PROJECT_TYPESelect").val() == "")
+                    {
+                        $(this).val("");
+                        alert("請先選擇計畫類型");
+                    }
+                });
+
+                ts = $("#tabstrip").kendoTabStrip({
+                    animation: {
+                        open: {
+                            effects: "fadeIn"
+                        }
+                    }
+                }).data("kendoTabStrip");
+            
+                $("input[id$='DatePicker']").kendoDatePicker({
+                    culture: "zh-TW",
+                    format: "yyyyMMdd"
+                });
+
+                $("input[id$='NumText']").kendoNumericTextBox({
+                    format: "N0",
+                    decimals: 0,
+                    min: 0,
+                    step: 1
+                });
+
+                $("input[id$='CASHText']").kendoNumericTextBox({
+                    format: "N0",
+                    decimals: 0,
+                    min: 0,
+                    step: 1000
+                });
+
+                $("#PROJECT_SEQ_NO_Sel_2").kendoDropDownList({
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    dataSource: {
+                        transport: {
+                            read: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=GET_USER_PROJECT",
+                            dataType: "json"
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                        }
+                    },
+                    dataBound: function (e) {
+                        $("#QueryButton_SUPPLIER").click();
+                    }
+                }).closest("span").width(350);
+
+                $("#PROJECT_SEQ_NO_Sel_2").closest("span").height("34px");
+
+                $("#PROJECT_SEQ_NO_Sel_3").kendoDropDownList({
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    filter: "contains",
+                    dataSource: {
+                        transport: {
+                            read: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=GET_USER_PROJECT",
+                            dataType: "json"
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                        }
+                    }
+                }).closest("span").width(350);
+
+                $("#PROJECT_SEQ_NO_Sel_3").closest("span").height("34px");
+
+                $("#QueryButton_PROJECT_HR").kendoButton({
+                    click: function (e) {
+                        dataSource_PROJECT_HR.read();
+                    }
+                });
+
+                $("#INCOME_TYPESelect").kendoDropDownList({
+                    valuePrimitive: true,
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    dataSource: {
+                        transport: {
+                            read: {
+                                url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                data: function () {
+                                    return { SysCodeType: "02" };
+                                }
+                            },
+                            dataType: "json"
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                        }
+                    },
+                    dataBound: function (e) {
+                        $("#INCOME_TYPESelect").data("kendoDropDownList").select(2);
+                    }
+                }).closest("span").width(205);
+
+                $("#PROJECT_TYPESelect").kendoDropDownList({
+                    valuePrimitive: true,
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    dataSource: {
+                        transport: {
+                            read: {
+                                type: "POST",
+                                url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=GET_PROJECT_TYPE",
+                                dataType: "json"
+                            }
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCodeNM: "MGTSysCodeNM", MGTSysCode: "MGTSysCode" }
+                        }
+                    },
+                    change: function (e) {
+                        var value = this.value();
+                        if (value == "11") {
+                            $("#PROJECT_ID_YEAR_Text").show();
+                        }
+                        else {
+                            $("#PROJECT_ID_YEAR_Text").hide();
+                        }
+                    },
+                }).closest("span").width(205);
+
+
+                $("#PROJECT_TYPE2Select").kendoDropDownList({
+                    valuePrimitive: true,
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    dataSource: {
+                        transport: {
+                            read: {
+                                url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                data: function () {
+                                    return { SysCodeType: "09" };
+                                }
+                            },
+                            dataType: "json"
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                        }
+                    },
+                    dataBound: function (e) {
+                        $("#PROJECT_TYPE2Select").data("kendoDropDownList").select(1);
+                    }
+                }).closest("span").width(205);
+
+                $("#PROJECT_DEPARTSelect").kendoDropDownList({
+                    valuePrimitive: true,
+                    dataTextField: "MGTSysCodeNM",
+                    dataValueField: "MGTSysCode",
+                    optionLabel: "-- 請選擇 --",
+                    dataSource: {
+                        transport: {
+                            read: {
+                                type: "POST",
+                                url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=GET_DEPT",
+                                dataType: "json"
+                            }
+                        },
+                        schema: {
+                            type: 'json',
+                            data: 'DATA',
+                            model: { MGTSysCodeNM: "MGTSysCodeNM", MGTSysCode: "MGTSysCode" }
+                        }
+                    }
+                }).closest("span").width(205);
+
+                $("#CHECK_PROJECT_ID").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+                        PROJECT_ID = $("input[id='PROJECT_ID_YEAR_Text']").val() != "" ? $("input[id='PROJECT_IDText']").val() + "-" + $("input[id='PROJECT_ID_YEAR_Text']").val() : $("input[id='PROJECT_IDText']").val();
+                        $.ajax({
+                            type: "POST",
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=CHECK_PROJECT_ID",
+                            data:
+                            {
+                                PROJECT_ID: PROJECT_ID
+                            },
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                $('#div_CHECK_PROJECT_ID').empty().append(result.SRESULT);
+                            }
+                        });
+                    }
+                });
+
+                $("#btn_Y").kendoButton({
+                    click: function (e) {
+
+                        if ($("#PROJECT_TYPESelect").val() != "" && $("#BUDGET_YEARText").val() != "") {
+                            $.ajax({
+                                type: "POST",
+                                url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=get_COM_PROJECT_ID",
+                                data:
+                                {
+                                    PROJECT_TYPE: $("#PROJECT_TYPESelect").val(),
+                                    BUDGET_YEAR: $("#BUDGET_YEARText").val()
+                                },
+                                complete: function (jqXhr, textStatus) {
+                                    var result = jQuery.parseJSON(jqXhr.responseText);
+                                    $('#PROJECT_IDText').val(result.SMESSAGE);
+                                    $('#PROJECT_IDText').attr('disabled', true);
+                                    $('#PROJECT_IDText').css('background-color', '#cccccc');
+                                    $("#btn_next").click();
+                                    window.close();
+                                }
+                            });
+                        }
+                        else {
+                            alert("「計畫類別」或「計畫執行年度(民國年)」尚未填寫，請再次確認");
+                        }
+
+                    }
+                });
+
+                $("#btn_N").kendoButton({
+                    click: function (e) {
+                        window.close();
+                    }
+                });
+            }
+
+            function ini_kendowindow() {
+
+                DIRECTOR_NAME_wnd = $("#DIRECTOR_NAME_DIV").kendoWindow({
+                    actions: ["Close"],
+                    title: "選擇計畫主持人",
+                    modal: true,
+                    visible: false,
+                    resizable: false,
+                    width: 700
+                }).data("kendoWindow");
+
+                PROJECT_SEQ_NO_wnd = $("#PROJECT_SEQ_NO_DIV").kendoWindow({
+                    actions: ["Close"],
+                    title: "選擇計畫編號",
+                    modal: true,
+                    visible: false,
+                    resizable: false,
+                    width: 700
+                }).data("kendoWindow");
+
+                INV_SUPPLIER_wnd = $("#INV_SUPPLIER_DIV").kendoWindow({
+                    actions: ["Close"],
+                    title: "選擇廠商",
+                    modal: true,
+                    visible: false,
+                    resizable: false,
+                    width: 700
+                }).data("kendoWindow");
+
+                window = $("#window").kendoWindow({
+                    title: "確認視窗",
+                    visible: false,
+                    width: "500px",
+                    modal: true
+                }).data("kendoWindow");
+
+                completemsg = $("#div_completemsg").kendoWindow({
+                    title: "Information",
+                    visible: false,
+                    width: "400px",
+                    height: "200px",
+                    modal: true
+                }).data("kendoWindow");
+                
+            }
+
+            function btn_GET_DIRECTOR_NAME() {
+                var dataSource_DIRECTOR_NAME = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_SYS_BASCODE.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "GET_DIRECTOR_NAME",
+                                    NAMEC: $("#NAMEC").val(),
+                                    CARDNO: $("#CARDNO").val(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "CARDNO",
+                            fields: {
+                                NAMEC: { editable: false, type: "string" },
+                                CARDNO: { editable: false, type: "string" },
+                                DEPTNO: { editable: false, type: "string" }
+                            }
+                        }
+                    },
+                    requestEnd: function (e) {
+                        if (e.type != null) {
+                            if (e.response.SRESULT == 'BREAK') {
+                                alert(e.response.SMESSAGE);
+                                location.href = ('../SW_RBM_LOGIN.ASPX');
+                            }
+                        }
+                    }
+                });
+
+                $("#DIRECTOR_NAME_Grid").kendoGrid({
+                    autoBind: false,
+                    scrollable: true,
+                    dataSource: dataSource_DIRECTOR_NAME,
+                    edit: function (e) {
+                        $('.k-grid-update').text('新增');
+                        $('.k-grid-cancel').text('取消');
+                        $('.k-window-title').text('選擇計畫主持人');
+                    },
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    columns: [
+                        { field: "NAMEC", title: "姓名", width: 50 },
+                        { field: "DEPTNO", title: "院內部門", width: 50 },
+                        { field: "CARDNO", title: "院內卡號", width: 50 },
+                        { command: [{ name: "select", text: "選取", click: SELECT_DIRECTOR_NAME }], title: "選取", width: 50 }
+                    ]
+                }).data("kendoGrid");
+
+                function SELECT_DIRECTOR_NAME(e) {
+                    e.preventDefault();
+
+                    //在ADDIRB_DIV放進template
+                    var dataItem = this.dataItem($(e.currentTarget).closest("tr"));
+                    $('#DIRECTOR_NAMEText').val(dataItem.CARDNO + "_" + dataItem.NAMEC);
+                    DIRECTOR_NAME_wnd.close();
+                }
+
+                $("#btn_GET_DIRECTOR_NAME").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+                        DIRECTOR_NAME_wnd.center().open();
+                    }
+                });
+
+                $("#QueryButton_DIRECTOR_NAME").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+                        dataSource_DIRECTOR_NAME.read();
+                    }
+                });
+            }
+
+            function btn_PROJECT_SEQ_NO() {
+                dataSource_PROJECT_SEQ_NO = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "GET_PROJECT_ID_PROJECT",
+                                    PROJECT_NAMEC: $("#PROJECT_NAMEC_Text").val(),
+                                    PROJECT_ID: $("#PROJECT_ID_Text").val(),
+                                    MEMBER_NAMEC: $("#DIRECTOR_NAME_Text").val(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "PROJECT_SEQ_NO",
+                            fields: {
+                                PROJECT_SEQ_NO: { editable: false, type: "string" },
+                                PROJECT_ID: { editable: false, type: "string" }
+                            }
+                        }
+                    }
+                });
+
+                $("#PROJECT_SEQ_NO_Grid").kendoGrid({
+                    autoBind: false,
+                    scrollable: true,
+                    dataSource: dataSource_PROJECT_SEQ_NO,
+                    edit: function (e) {
+                        $('.k-grid-update').text('新增');
+                        $('.k-grid-cancel').text('取消');
+                        $('.k-window-title').text('選擇計畫');
+                    },
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    columns: [
+                        { field: "PROJECT_ID", title: "計畫名稱", width: 100 },
+                        { command: [{ name: "select", text: "選取", click: SELECT_PROJECT_SEQ_NO }], title: "選取", width: 50 }
+                    ]
+                }).data("kendoGrid");
+
+                function SELECT_PROJECT_SEQ_NO(e) {
+                    e.preventDefault();
+
+                    var dataItem = this.dataItem($(e.currentTarget).closest("tr"));
+                    $('#PROJECT_SEQ_NO_2').val(dataItem.PROJECT_ID + "_" + dataItem.PROJECT_SEQ_NO);
+
+                    if ($('#CONTRACT_BEGIN_DATE').val() != null && $('#CONTRACT_CONCLUDE_DATE').val() != null) {
+                        $('#div_MEMBER_NAMEC').html(dataItem.MEMBER_NAMEC);
+                        $('#CONTRACT_BEGIN_DATE').data("kendoDatePicker").value(dataItem.CONTRACT_BEGIN_DATE);
+                        $('#CONTRACT_CONCLUDE_DATE').data("kendoDatePicker").value(dataItem.CONTRACT_CONCLUDE_DATE);
+                    }
+                    PROJECT_SEQ_NO_wnd.close();
+                }
+            }
+
+            function ini_PROJECT_HR_Grid() {
+                dataSource_PROJECT_HR = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        create: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                if (result.SRESULT == "TRUE") {
+                                    dataSource_PROJECT_HR.read();
+                                }
+                            }
+                        },
+                        update: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                if (result.SRESULT == "TRUE") {
+                                    dataSource_PROJECT_HR.read();
+                                }
+                            }
+                        },
+                        destroy: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                            }
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "PROJECT_HR_R",
+                                    PROJECT_SEQ_NO: $("#PROJECT_SEQ_NO_Sel_3").val(),
+                                    MEMBER_NAMEC: $("#MEMBER_NAMEC_Text").val(),
+                                    MEMBER_CARD_NO: $("#MEMBER_CARD_NO_Text").val().toUpperCase(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                            else {
+                                var Fcode;
+                                switch (operation) {
+                                    case "update": Fcode = "PROJECT_HR_U";
+                                        break;
+                                    case "create": Fcode = "PROJECT_HR_C";
+                                        break;
+                                    case "destroy": Fcode = "PROJECT_HR_D";
+                                        break;
+                                }
+                                return {
+                                    FCode: Fcode,
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "IDNO",
+                            fields: {
+                                PROJECT_SEQ_NO: { editable: false, type: "string", validation: { required: true } },
+                                IDNO: { editable: false, type: "string", validation: { required: true } },
+                                MEMBER_KIND: { editable: true, type: "string", validation: { required: true } },
+                                MEMBER_KIND_NM: { editable: true, type: "string" },
+                                MEMBER_NAMEC: { editable: true, type: "string" },
+                                MEMBER_CARD_NO: { editable: true, type: "string" },
+                                MEMBER_TEL: { editable: true, type: "string" },
+                                MEMBER_EMAIL: { editable: true, type: "string" },
+                                PROJECT_ID: { editable: true, type: "string" }
+                            }
+                        }
+                    },
+                    pageSize: 20,
+                    serverPaging: true,//使用server端的分頁，點選分頁將會重新綁定DataSoure給Grid
+                    serverSorting: true//使用server端的排序，點選排序將會重新綁定DataSoure給Grid
+                });
+
+                $("#PROJECT_HR_Grid").kendoGrid({
+                    scrollable: true,
+                    dataSource: dataSource_PROJECT_HR,
+                    height: 600,
+                    groupable: true,
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    toolbar: [{ name: "create", text: "新增計畫相關人員" }],
+                    pageable: {
+                        pageSizes: true,
+                        buttonCount: 5
+                    },
+                    editable: {
+                        confirmation: "確定刪除？",
+                        mode: "popup", //使用Popup的模式編輯資料
+                        update: true, // 若設定為True,當按下Update即更新server資料
+                        window: {
+                            width: 900
+                        },
+                        template: kendo.template($("#popup-editor2").html())
+                    },
+                    dataBound: function () {
+                        //判斷欄位值，清空某一欄資料
+                        $('#PROJECT_HR_Grid tr[role=row]:not(:first)', 'div#body').each(function (i, row) {
+                            if ($(this).find('td').eq(2).text() == '計畫主持人') {
+                                $(this).find('td').eq(0).empty();
+                                $(this).find('td').eq(5).empty();//聯絡電話
+                                $(this).find('td').eq(6).empty();//email
+                            }
+                        });
+                    },
+                    edit: function (e) {
+                        $('#PROJECT_SEQ_NO_2').attr('disabled', true);
+                        $('#PROJECT_SEQ_NO_2').css('background-color', '#cccccc');
+
+                        $("#btn_GET_PROJECT_SEQ_NO").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                PROJECT_SEQ_NO_wnd.center().open();
+                            }
+                        });
+
+                        $("#QueryButton_PROJECT_SEQ_NO").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                dataSource_PROJECT_SEQ_NO.read();
+                            }
+                        });
+
+                        e.container.find("input[name=MEMBER_KIND]").kendoDropDownList({
+                            dataTextField: "MGTSysCodeNM",
+                            dataValueField: "MGTSysCode",
+                            optionLabel: "-- 請選擇 --",
+                            dataSource: {
+                                transport: {
+                                    read: {
+                                        url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                        data: function () {
+                                            return {
+                                                SysCodeType: "10",
+                                                SpecNotLike: "0",
+                                                SpecNotEqul: "10"
+                                            };
+                                        }
+                                    },
+                                    dataType: "json"
+                                },
+                                schema: {
+                                    type: 'json',
+                                    data: 'DATA',
+                                    model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                                }
+                            }
+                        }).closest("span").width(200);
+
+                        e.container.find("input[name=MEMBER_KIND]").closest("span").height("34px");
+
+                        e.container.find("input[name=SALARY_APPROVE_AMT]").kendoNumericTextBox({
+                            format: "N0",
+                            decimals: 0,
+                            min: 0,
+                            step: 1000
+                        });
+
+                        //視窗寬度設定
+                        e.container.find('.k-edit-form-container').width('100%');
+
+                        //判斷編輯視窗狀態
+                        if (!e.model.isNew()) {
+                            //編輯
+                            $('#PROJECT_SEQ_NO_2').hide();
+                            e.container.find("#btn_GET_PROJECT_SEQ_NO").hide();
+                            $('#PROJECT_SEQ_NO_2').val(e.model.PROJECT_ID + "_" + e.model.PROJECT_SEQ_NO);
+                            e.container.find("#div_PROJECT_SEQ_NO").html(e.model.PROJECT_ID);
+
+                            $('.k-grid-update').text('儲存');
+                            $('.k-grid-cancel').text('取消');
+                            $('.k-window-title').text('編輯計畫相關人員');
+                        }
+                        else {
+                            //新增
+                            $('.k-grid-update').text('儲存');
+                            $('.k-grid-cancel').text('取消');
+                            $('.k-window-title').text('新增計畫相關人員');
+                        }
+
+                    },
+                    save: function (e) {
+
+
+                        if ($("#PROJECT_SEQ_NO_2").val() == "") {
+                            e.preventDefault();
+                            alert("請選擇計畫編號");
+                        }
+                        else {
+                            var arr_PROJECT_SEQ_NO = $("#PROJECT_SEQ_NO_2").val().split("_");
+                            e.model.PROJECT_SEQ_NO = arr_PROJECT_SEQ_NO[arr_PROJECT_SEQ_NO.length - 1];
+                        }
+                    },
+                    columns: [
+                        { command: [{ name: "edit", text: "修改" }, { name: "destroy", text: "刪除" }], title: "", width: 90 },
+                        { field: "PROJECT_ID", title: "計畫編號", width: 100, sortable: false },
+                        { field: "MEMBER_KIND", title: "人員類型", width: 70, template: "#=MEMBER_KIND_NM#" },
+                        { field: "MEMBER_NAMEC", title: "姓名", width: 50 },
+                        { field: "MEMBER_CARD_NO", title: "卡號", width: 50 },
+                        { field: "MEMBER_TEL", title: "連絡電話", width: 50 },
+                        { field: "MEMBER_EMAIL", title: "EMAIL", width: 110 }
+                    ]
+                });
+            }
+            
+            function ini_SUPPLIER_Grid() {
+                $("#QueryButton_SUPPLIER").kendoButton({
+                    click: function (e) {
+                        dataSource_SUPPLIER.read();
+                    }
+                });
+
+                var dataSource_SUPPLIER = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        create: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                if (result.SRESULT == "TRUE") {
+                                    dataSource_SUPPLIER.read();
+                                }
+                            }
+                        },
+                        update: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                if (result.SRESULT == "TRUE") {
+                                    dataSource_SUPPLIER.read();
+                                }
+                            }
+                        },
+                        destroy: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST",
+                            complete: function (jqXhr, textStatus) {
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                            }
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "SUPPLIER_R",
+                                    PROJECT_SEQ_NO: $("#PROJECT_SEQ_NO_Sel_2").val(),
+                                    PROJECT_ID: $("#PROJECT_ID_Text_2").val(),
+                                    SUPPLIER_NAME: $("#SUPPLIER_NAME_Text_2").val(),
+                                    SUPPLIER_ID: $("#SUPPLIER_ID_Text_2").val(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                            else {
+                                var Fcode;
+                                switch (operation) {
+                                    case "update": Fcode = "SUPPLIER_U";
+                                        break;
+                                    case "create": Fcode = "SUPPLIER_C";
+                                        break;
+                                    case "destroy": Fcode = "SUPPLIER_D";
+                                        break;
+                                }
+                                return {
+                                    FCode: Fcode,
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "SUPPLIER_ID",
+                            fields: {
+                                PROJECT_ID: { editable: true, type: "string" },
+                                PROJECT_SEQ_NO: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_ID: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_NAME: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_DIRECTOR: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_CONTACT: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_TEL: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_FAX: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_EMAIL: { editable: true, type: "string", validation: { required: true } },
+                                CONTRACT_STATUS: { editable: true, type: "string", validation: { required: true } },
+                                SUPPLIER_EMAIL: { editable: true, type: "string", validation: { required: true } },
+                                CONTRACT_BEGIN_DATE: { editable: true, type: "string" },
+                                CONTRACT_REFUND_DATE: { editable: true, type: "string" },
+                                CONTRACT_CONCLUDE_DATE: { editable: true, type: "string" },
+                                CONTRACT_BUDGET_LIMIT: { editable: true, type: "number" },
+                                CONTRACT_AUTOMAIL_YN: { editable: true, type: "string" },
+                                TRIAL_CATEGORY: { editable: true, type: "string" },
+                                TRIAL_CATEGORY_CONTENT: { editable: true, type: "string" },
+                                DRUG_LEVEL: { editable: true, type: "string" },
+                                DRUG_LEVEL_CONTENT: { editable: true, type: "string" },
+                                NATIONAL_FLAG: { editable: true, type: "string" },
+                                COUNTRY_NAME: { editable: true, type: "string" },
+                                TAIWAN_DIRECTOR: { editable: true, type: "string" },
+                                USE_FLAG: { editable: true, type: "string" },
+                                REMARK: { editable: true, type: "string" },
+                                MEMBER_NAMEC: { editable: false, type: "string" }
+                            }
+                        }
+                    },
+                    pageSize: 20,
+                    serverPaging: true,//使用server端的分頁，點選分頁將會重新綁定DataSoure給Grid
+                    serverSorting: true//使用server端的排序，點選排序將會重新綁定DataSoure給Grid
+                });
+
+                $("#SUPPLIER_Grid").kendoGrid({
+                    scrollable: true,
+                    dataSource: dataSource_SUPPLIER,
+                    height: 600,
+                    groupable: true,
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    toolbar: [{ name: "create", text: "新增合作廠商" }],
+                    pageable: {
+                        pageSizes: true,
+                        buttonCount: 5
+                    },
+                    editable: {
+                        confirmation: "確定刪除？",
+                        mode: "popup", //使用Popup的模式編輯資料
+                        update: true, // 若設定為True,當按下Update即更新server資料
+                        window: {
+                            width: 1000
+                        },
+                        template: kendo.template($("#popup-editor").html())
+                    },
+                    edit: function (e) {
+
+                        $('#PROJECT_SEQ_NO_2').attr('disabled', true);
+                        $('#PROJECT_SEQ_NO_2').css('background-color', '#cccccc');
+
+                        $("#btn_GET_PROJECT_SEQ_NO").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                PROJECT_SEQ_NO_wnd.center().open();
+                            }
+                        });
+
+                        $("#QueryButton_PROJECT_SEQ_NO").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                dataSource_PROJECT_SEQ_NO.read();
+                            }
+                        });
+
+                        e.container.find("#CONTRACT_STATUS").kendoDropDownList({
+                            valuePrimitive: true,
+                            dataTextField: "MGTSysCodeNM",
+                            dataValueField: "MGTSysCode",
+                            optionLabel: "-- 請選擇 --",
+                            dataSource: {
+                                transport: {
+                                    read: {
+                                        url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                        data: function () {
+                                            return { SysCodeType: "11" };
+                                        }
+                                    },
+                                    dataType: "json"
+                                },
+                                schema: {
+                                    type: 'json',
+                                    data: 'DATA',
+                                    model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                                }
+                            }
+                        }).closest("span").width(205);
+
+                        e.container.find("input[name=TRIAL_CATEGORY_CONTENT]").css("display", "none");
+                        e.container.find("#TRIAL_CATEGORY").kendoDropDownList({
+                            valuePrimitive: true,
+                            dataTextField: "MGTSysCodeNM",
+                            dataValueField: "MGTSysCode",
+                            optionLabel: "-- 請選擇 --",
+                            dataSource: {
+                                transport: {
+                                    read: {
+                                        url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                        data: function () {
+                                            return { SysCodeType: "06" };
+                                        }
+                                    },
+                                    dataType: "json"
+                                },
+                                schema: {
+                                    type: 'json',
+                                    data: 'DATA',
+                                    model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                                }
+                            },
+                            change: function (e) {
+                                var value = this.value();
+                                if (value == "9") {
+                                    $("input[name=TRIAL_CATEGORY_CONTENT]").css("display", "inline");
+                                }
+                                else {
+                                    $("input[name=TRIAL_CATEGORY_CONTENT]").css("display", "none");
+                                }
+                            }
+                        }).closest("span").width(205);
+
+                        $("#DIV_DRUG_LEVEL").hide();
+                        e.container.find("#DRUG_LEVEL").kendoDropDownList({
+                            valuePrimitive: true,
+                            dataTextField: "MGTSysCodeNM",
+                            dataValueField: "MGTSysCode",
+                            optionLabel: "-- 請選擇 --",
+                            dataSource: {
+                                transport: {
+                                    read: {
+                                        url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                        data: function () {
+                                            return { SysCodeType: "07" };
+                                        }
+                                    },
+                                    dataType: "json"
+                                },
+                                schema: {
+                                    type: 'json',
+                                    data: 'DATA',
+                                    model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                                }
+                            },
+                            change: function (e) {
+                                var value = this.value();
+                                if (value == "9") {
+                                    $("#DIV_DRUG_LEVEL").show();
+                                }
+                                else {
+                                    $("#DIV_DRUG_LEVEL").hide();
+                                }
+                            }
+                        }).closest("span").width(205);
+
+                        e.container.find("#NATIONAL_FLAG").kendoDropDownList({
+                            valuePrimitive: true,
+                            dataTextField: "MGTSysCodeNM",
+                            dataValueField: "MGTSysCode",
+                            optionLabel: "-- 請選擇 --",
+                            dataSource: {
+                                transport: {
+                                    read: {
+                                        url: "../SERVICES/WS_SYS_BASCODE.ashx?FCode=R",
+                                        data: function () {
+                                            return { SysCodeType: "08" };
+                                        }
+                                    },
+                                    dataType: "json"
+                                },
+                                schema: {
+                                    type: 'json',
+                                    data: 'DATA',
+                                    model: { MGTSysCode: "MGTSysCode", MGTSysCodeNM: "MGTSysCodeNM" }
+                                }
+                            }
+                        }).closest("span").width(205);
+
+                        $("input[id$='DATE']").kendoDatePicker({
+                            culture: "zh-TW",
+                            format: "yyyyMMdd"
+                        }).closest("span").width(145);
+
+                        if (!e.model.isNew()) {
+                            //編輯   
+                            $("#PROJECT_SEQ_NO_2").hide();
+                            $("#btn_GET_PROJECT_SEQ_NO").hide();
+                            $("#PROJECT_SEQ_NO_2").val(e.model.PROJECT_ID + "_" + e.model.PROJECT_SEQ_NO);
+
+                            $("#div_PROJECT_SEQ_NO").html(e.model.PROJECT_ID);
+                            $("#div_MEMBER_NAMEC").html(e.model.MEMBER_NAMEC);
+                            $("#SUPPLIER_ID").hide();
+                            $("#btn_GET_SUPPLIER").hide();
+                            $("#div_SUPPLIER_ID").html(e.model.SUPPLIER_ID);
+                        }
+                        else {
+                            //新增
+                            e.model.CONTRACT_BUDGET_LIMIT = 20000;
+                        }
+
+                        e.container.find("#CONTRACT_BUDGET_LIMIT").kendoNumericTextBox({
+                            format: "N0",
+                            decimals: 0,
+                            min: 0,
+                            step: 1
+                        });
+
+                        $("#btn_GET_SUPPLIER").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                INV_SUPPLIER_wnd.center().open();
+                            }
+                        });
+
+                        $("#QueryButton_INV_SUPPLIER").kendoButton({
+                            spriteCssClass: "",
+                            click: function (e) {
+                                dataSource_INV_SUPPLIER.read();
+                            }
+                        });
+
+
+                        //視窗寬度設定
+                        e.container.find('.k-edit-form-container').width('100%');
+
+                        //確認資料沒問題
+                        $('#Check_YN').attr('checked', false);
+                        $('.k-grid-update').hide();
+                        $('#Check_YN').bind('change', function () {
+                            if ($(this).is(':checked'))
+                                $(".k-grid-update").show();
+                            else
+                                $(".k-grid-update").hide();
+                        });
+
+                        //判斷編輯視窗狀態
+                        if (!e.model.isNew()) {
+                            //編輯
+                            $('.k-grid-update').text('更新');
+                            $('.k-grid-cancel').text('返回');
+                            $('.k-window-title').text('編輯');
+
+                            e.container.find("#getDATA").hide();
+                            //變色
+                            $('#CLOTH_CODE').attr('disabled', true);
+                            $('#CLOTH_CODE').css('background-color', '#cccccc');
+                        }
+                        else {
+                            //新增
+                            $('.k-grid-update').text('確定');
+                            $('.k-grid-cancel').text('取消');
+                            $('.k-window-title').text('新增');
+                        }
+
+                    },
+                    save: function (e) {
+                        if ($("#PROJECT_SEQ_NO_2").val() == "") {
+                            e.preventDefault();
+                            alert("請先選擇計畫編號");
+                        }
+                        else {
+                            e.model.CONTRACT_BEGIN_DATE = $('#CONTRACT_BEGIN_DATE').val();
+                            e.model.CONTRACT_CONCLUDE_DATE = $('#CONTRACT_CONCLUDE_DATE').val();
+                            if (isNaN(e.model.CONTRACT_BEGIN_DATE)) {
+                                e.model.CONTRACT_BEGIN_DATE = kendo.toString(new Date(e.model.CONTRACT_BEGIN_DATE), 'yyyyMMdd');
+                            }
+                            if (isNaN(e.model.CONTRACT_REFUND_DATE)) {
+                                e.model.CONTRACT_REFUND_DATE = kendo.toString(new Date(e.model.CONTRACT_REFUND_DATE), 'yyyyMMdd');
+                            }
+                            if (isNaN(e.model.CONTRACT_CONCLUDE_DATE)) {
+                                e.model.CONTRACT_CONCLUDE_DATE = kendo.toString(new Date(e.model.CONTRACT_CONCLUDE_DATE), 'yyyyMMdd');
+                            }
+                            if (isNaN(e.model.CONTRACT_CHANGE_DATE)) {
+                                e.model.CONTRACT_CHANGE_DATE = kendo.toString(new Date(e.model.CONTRACT_CHANGE_DATE), 'yyyyMMdd');
+                            }
+                            var arr_PROJECT_SEQ_NO = $("#PROJECT_SEQ_NO_2").val().split("_");
+                            e.model.PROJECT_SEQ_NO = arr_PROJECT_SEQ_NO[arr_PROJECT_SEQ_NO.length - 1];
+
+                            e.model.CONTRACT_STATUS = $("#CONTRACT_STATUS").val();
+                            e.model.TRIAL_CATEGORY = $("#TRIAL_CATEGORY").val();
+                            e.model.DRUG_LEVEL = $("#DRUG_LEVEL").val();
+                            e.model.NATIONAL_FLAG = $("#NATIONAL_FLAG").val();
+
+                            e.model.CONTRACT_BUDGET_LIMIT = $("#CONTRACT_BUDGET_LIMIT").val();
+
+                            e.model.SUPPLIER_NAME = $("#SUPPLIER_NAME").val();
+                            e.model.SUPPLIER_DIRECTOR = $("#SUPPLIER_DIRECTOR").val();
+                            e.model.SUPPLIER_CONTACT = $("#SUPPLIER_CONTACT").val();
+                            e.model.SUPPLIER_TEL = $("#SUPPLIER_TEL").val();
+                            e.model.SUPPLIER_EMAIL = $("#SUPPLIER_EMAIL").val();
+                            e.model.SUPPLIER_ID = $("#SUPPLIER_ID").val();
+                        }                        
+                    },
+                    columns: [
+                        { command: [{ name: "edit", text: "修改" }], width: 8 },
+                        { command: [{ name: "destroy", text: "刪除" }], width: 8 },
+                        { field: "PROJECT_ID", title: "計畫編號", width: 30 },
+                        { field: "MEMBER_NAMEC", title: "主持人", width: 8 },
+                        { field: "SUPPLIER_ID", title: "統一編號", width: 10 },
+                        { field: "SUPPLIER_NAME", title: "廠商名稱", width: 10 },
+                        { field: "SUPPLIER_CONTACT", title: "聯絡人", width: 8 },
+                        { field: "SUPPLIER_TEL", title: "電話", width: 12 },
+                        { field: "CONTRACT_BEGIN_DATE", title: "合約簽定啟始日期", width: 10, editor: dateEditor, format: "{0:yyyyMMdd}" },
+                        { field: "CONTRACT_CONCLUDE_DATE", title: "合約結案日期", width: 10, editor: dateEditor, format: "{0:yyyyMMdd}" },
+                    ]
+                });
+            }
+                        
+            function btn_GET_INV_SUPPLIER() {
+                dataSource_INV_SUPPLIER = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "GET_SUPPLIER",
+                                    SUPPLIER_NAME: $("#SUPPLIER_NAME_Text").val(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "SUPPLIER_ID",
+                            fields: {
+                                SUPPLIER_ID: { editable: false, type: "string" },
+                                SUPPLIER_NAME: { editable: false, type: "string" },
+                                SUPPLIER_DIRECTOR: { editable: false, type: "string" },
+                                SUPPLIER_CONTACT: { editable: false, type: "string" },
+                                SUPPLIER_TEL: { editable: false, type: "string" },
+                                SUPPLIER_EMAIL: { editable: false, type: "string" }
+                            }
+                        }
+                    }
+                });
+
+                $("#INV_SUPPLIER_Grid").kendoGrid({
+                    autoBind: false,
+                    scrollable: true,
+                    dataSource: dataSource_INV_SUPPLIER,
+                    edit: function (e) {
+                        $('.k-grid-update').text('新增');
+                        $('.k-grid-cancel').text('取消');
+                        $('.k-window-title').text('選擇計畫');
+                    },
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    columns: [
+                        { field: "SUPPLIER_ID", title: "統一編號", width: 100 },
+                        { field: "SUPPLIER_NAME", title: "廠商名稱", width: 100 },
+                        { field: "SUPPLIER_DIRECTOR", title: "負責人姓名", width: 100 },
+                        { field: "SUPPLIER_CONTACT", title: "聯絡人", width: 100 },
+                        { field: "SUPPLIER_TEL", title: "電話", width: 100 },
+                        { field: "SUPPLIER_EMAIL", title: "EMAIL", width: 100 },
+                        { command: [{ name: "select", text: "選取", click: SELECT_INV_SUPPLIER }], title: "選取", width: 50 }
+                    ]
+                });
+
+                function SELECT_INV_SUPPLIER(e) {
+                    e.preventDefault();
+
+                    var dataItem = this.dataItem($(e.currentTarget).closest("tr"));
+                    $('#SUPPLIER_ID').val(dataItem.SUPPLIER_ID);
+                    $('#SUPPLIER_NAME').val(dataItem.SUPPLIER_NAME);
+                    $('#SUPPLIER_DIRECTOR').val(dataItem.SUPPLIER_DIRECTOR);
+                    $('#SUPPLIER_CONTACT').val(dataItem.SUPPLIER_CONTACT);
+                    $('#SUPPLIER_TEL').val(dataItem.SUPPLIER_TEL);
+                    $('#SUPPLIER_EMAIL').val(dataItem.SUPPLIER_EMAIL);
+
+                    INV_SUPPLIER_wnd.close();
+                }
+            }
+
+            function ini_BUDGET_Grid() {
+                dataSource_BUDGET = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        update: {
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx",
+                            dataType: "json",
+                            type: "POST"
+                        },
+                        parameterMap: function (options, operation) {
+                            if (operation == "read") {
+                                return {
+                                    FCode: "BUDGET_R",
+                                    PROJECT_SEQ_NO: PROJECT_SEQ_NO,
+                                    PROJECT_TYPE: $("#PROJECT_TYPESelect").val(),
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                            else {
+                                var Fcode;
+                                switch (operation) {
+                                    case "update": Fcode = "BUDGET_U";
+                                        break;
+                                }
+                                return {
+                                    FCode: Fcode,
+                                    models: kendo.stringify(options)
+                                }
+                            }
+                        }
+                    },
+                    schema: {
+                        type: 'json',
+                        data: 'DATA',
+                        total: function (d) { return d.TOTALCOUNT; },
+                        model: {
+                            id: "PROJECT_SEQ_NO",
+                            fields: {
+                                PROJECT_SEQ_NO: { editable: false, type: "string", validation: { required: true } },
+                                PROJECT_TYPE: { editable: false, type: "string", validation: { required: true } },
+                                BUDGET_L_ID: { editable: false, type: "string" },
+                                BUDGET_L_NAMEC: { editable: false, type: "string" },
+                                BUDGET_S_NAMEC: { editable: false, type: "string" },
+                                ACTIVE_BUDGET: { editable: true, type: "number" }
+                            }
+                        }
+                    },
+                    batch: true,
+                    group: [{ field: "BUDGET_L_ID", aggregates: [{ field: "ACTIVE_BUDGET", aggregate: "sum" }] }],
+                    aggregate: [{ field: "ACTIVE_BUDGET", aggregate: "sum" }],
+                    sort: { field: "BUDGET_S_ID", dir: "asc" }
+                });
+
+                $("#BUDGET_Grid").kendoGrid({
+                    scrollable: true,
+                    dataSource: dataSource_BUDGET,
+                    groupable: true,
+                    toolbar: [
+                           { name: "save", text: "儲存變更" }
+                    ],
+                    selectable: true,
+                    resizable: true,
+                    sortable: true,
+                    editable: { confirmation: false },
+                    dataBound: function () {
+                        $(".k-group-col,.k-group-cell,.k-i-collapse").remove();
+                        var spanCells = $(".k-grouping-row").children("td");
+                        spanCells.each(function () {
+                            $(this).attr("colspan", $(this).attr("colspan") - 1);
+                        });
+                    },
+                    columns: [
+                        { field: "BUDGET_L_ID", title: "經費類別", width: 20, hidden: true },
+                        { field: "BUDGET_L_NAMEC", title: "經費類別", width: 20 },
+                        { field: "BUDGET_S_NAMEC", title: "經費項目", width: 20 },
+                        {
+                            field: "ACTIVE_BUDGET", title: "期初預算金額", width: 20,
+                            aggregates: ["sum"], footerTemplate: "總計: #=sum#",
+                            groupFooterTemplate: "小計: #=sum#"
+                        }
+                    ]
+                });
+            }
+            
+            function ini_ADD_PROJECT() {
+                
+                var validator = $("#userform").kendoValidator().data("kendoValidator");
+
+                $("#btn_next").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+
+                        PROJECT_ID = $("input[id='PROJECT_ID_YEAR_Text']").val() != "" ? $("input[id='PROJECT_IDText']").val() + "-" + $("input[id='PROJECT_ID_YEAR_Text']").val() : $("input[id='PROJECT_IDText']").val();
+
+                        if (PROJECT_ID == "") {
+                            window.center().open();
+                        }
+                        else {
+                            $.ajax({
+                                type: "POST",
+                                url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=CHECK_PROJECT_ID",
+                                data:
+                                {
+                                    PROJECT_ID: PROJECT_ID
+                                },
+                                complete: function (jqXhr, textStatus) {
+                                    var result = jQuery.parseJSON(jqXhr.responseText);
+                                    if (result.SRESULT == "TRUE") {
+                                        alert("此計畫已存在，請再次確認");
+                                    }
+                                        //臨床試驗的計畫編號跟IRB編號需一致   
+                                    else if (($("#PROJECT_TYPESelect").val() == "16") && (PROJECT_ID.toUpperCase() != $("input[id='IRB_NOText']").val().toUpperCase())) {
+                                        alert("臨床試驗計畫，計畫編號與IRB審核通過編號不一致，請再次確認。");
+                                    }
+                                    else {
+                                        if (validator.validate()) {
+
+                                            var PROJECT_BEGIN_DATE = $("#PROJECT_BEGIN_DatePicker").val();
+                                            var PROJECT_END_DATE = $("#PROJECT_END_DatePicker").val();
+
+                                            PROJECT_BEGIN_DATE = insert(insert(PROJECT_BEGIN_DATE, 4, "/"), 7, "/");
+                                            PROJECT_END_DATE = insert(insert(PROJECT_END_DATE, 4, "/"), 7, "/");
+
+                                            //檢核輸入的日期格式
+                                            if (isDate(PROJECT_BEGIN_DATE) == false || isDate(PROJECT_END_DATE) == false) {
+                                                alert('日期輸入有誤，請再次確認');
+                                            }
+                                                //check是否有輸入PROJECT_ID
+                                            else if (PROJECT_ID == "") {
+                                                alert('請輸入計畫編號');
+                                            }
+                                            else if ($("input[id='DIRECTOR_NAMEText']").val() == "") {
+                                                alert("請選擇計畫主持人");
+                                            }
+                                            else {
+                                                if (PROJECT_SEQ_NO == '') {
+                                                    var PAPER_YN = "N";
+                                                    if ($("input[id='PAPER_YNCheck']").is(':checked')) {
+                                                        PAPER_YN = "Y";
+                                                    }
+                                                    else {
+                                                        PAPER_YN = "N";
+                                                    };
+
+                                                    var arr_DIRECTOR_NAME = $("input[id='DIRECTOR_NAMEText']").val().split("_");
+
+                                                    $.ajax({
+                                                        type: "POST",
+                                                        url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=C",
+                                                        data:
+                                                        {
+                                                            PROJECT_ID: PROJECT_ID.toUpperCase(),
+                                                            MASTER_PROJECT_ID: $("input[id='MASTER_PROJECT_IDText']").val().toUpperCase(),
+                                                            IRB_NO: $("input[id='IRB_NOText']").val().toUpperCase(),
+                                                            PROJECT_NAMEC: $("input[id='PROJECT_NAMECText']").val(),
+                                                            PROJECT_NAME: $("input[id='PROJECT_NAMEText']").val(),
+                                                            PROJECT_TYPE: $("#PROJECT_TYPESelect").val(),
+                                                            PROJECT_CHILD_TYPE: $("input[id='PROJECT_CHILD_TYPE']").val(),
+                                                            PROJECT_TYPE2: $("#PROJECT_TYPE2Select").val(),
+                                                            BUDGET_YEAR: $("#BUDGET_YEARText").val(),
+                                                            PROJECT_DEPT: $("#PROJECT_DEPARTSelect").val(),
+                                                            DIRECTOR_NAME: arr_DIRECTOR_NAME[0],
+                                                            PROJECT_BEGIN_DATE: $("input[id='PROJECT_BEGIN_DatePicker']").val(),
+                                                            PROJECT_END_DATE: $("input[id='PROJECT_END_DatePicker']").val(),
+                                                            INCOME_TYPE: $("input[id='INCOME_TYPESelect']").val(),
+                                                            PAPER_YN: PAPER_YN,
+                                                            REMARK: $('textarea#REMARK').val(),
+                                                            SALARY_APPROVE_AMT: $("input[id='SALARY_APPROVE_AMTCASHText']").val()
+                                                        },
+                                                        complete: function (jqXhr, textStatus) {
+                                                            var result = jQuery.parseJSON(jqXhr.responseText);
+                                                            if (result.SRESULT == "TRUE") {
+                                                                alert(result.SMESSAGE);
+                                                                PROJECT_SEQ_NO = result.DATA;
+                                                                dataSource_BUDGET.read();
+
+                                                                $("#userform").hide();
+                                                                $("#step1_div").hide();
+                                                                $("#BUDGET_div").show();
+                                                            }
+                                                            else {
+                                                                alert("發生錯誤，請再次確認。原因：" + result.SMESSAGE);
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                                else {
+                                                    $.ajax({
+                                                        type: "POST",
+                                                        url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=UPDATE_PROJECT_TYPE",
+                                                        data:
+                                                        {
+                                                            PROJECT_TYPE: $("#PROJECT_TYPESelect").val(),
+                                                            PROJECT_SEQ_NO: PROJECT_SEQ_NO
+                                                        },
+                                                        complete: function (jqXhr, textStatus) {
+                                                            var result = jQuery.parseJSON(jqXhr.responseText);
+                                                            dataSource_BUDGET.read();
+                                                            $("#userform").hide();
+                                                            $("#step1_div").hide();
+                                                            $("#BUDGET_div").show();
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+
+                $("#btn_back").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+                        $("#BUDGET_Grid").data("kendoGrid").saveChanges();
+                        $("#userform").show();
+                        $("#step1_div").show();
+                        $("#BUDGET_div").hide();
+                    }
+                });
+
+                $("#btn_send").kendoButton({
+                    spriteCssClass: "",
+                    click: function (e) {
+                        $("#BUDGET_Grid").data("kendoGrid").saveChanges();
+                        $.ajax({
+                            type: "POST", //表單method
+                            url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=Complete",
+                            data:
+                            {
+                                PROJECT_SEQ_NO: PROJECT_SEQ_NO
+                            },
+                            complete: function (jqXhr, textStatus) {
+                                PROJECT_SEQ_NO = "";
+
+                                //新增完成，跳到新增相關聯絡人頁面
+                                if ($("#PROJECT_TYPESelect").val() == "16") {
+                                    ts.select(0);
+                                }
+                                else {
+                                    ts.select(2);
+                                }
+
+                                $("input[id='PROJECT_IDText']").val("");
+                                $("input[id='PROJECT_ID_YEAR_Text']").val("");
+                                $("input[id='MASTER_PROJECT_IDText']").val("");
+                                $("input[id='PROJECT_NAMECText']").val("");
+                                $("input[id='PROJECT_NAMEText']").val("");
+                                $("input[id='PROJECT_CHILD_TYPE']").val("");
+                                $("#BUDGET_YEARText").val("");
+                                $("#PROJECT_TYPE2Select").data('kendoDropDownList').value("");
+                                $("#PROJECT_TYPESelect").data('kendoDropDownList').value("");
+                                $("#PROJECT_DEPARTSelect").data('kendoDropDownList').value("");
+                                $("input[id='DIRECTOR_NAMEText']").val("");
+                                $("input[id='PROJECT_BEGIN_DatePicker']").val("");
+                                $("input[id='PROJECT_END_DatePicker']").val("");
+                                $("#INCOME_TYPESelect").data('kendoDropDownList').value("2");
+                                $("input[id='PAPER_YNCheck']").val("");
+                                $("textarea[id='REMARK']").val("");
+                                $("#SALARY_APPROVE_AMTCASHText").data("kendoNumericTextBox").value(10000);
+                                completemsg.center().open();
+
+                                var result = jQuery.parseJSON(jqXhr.responseText);
+                                alert(result.SMESSAGE);
+                                $("#userform").show();
+                                $("#step1_div").show();
+                                $("#BUDGET_div").hide();
+                                $('#PROJECT_IDText').attr('disabled', false);
+                                $('#PROJECT_IDText').css('background-color', 'white');
+
+                                
+                            }
+                        });
+                    }
+                });
+            }
+            
+            //function get_CONTRACT_DATE(PROJECT_SEQ_NO) {
+            //    $.ajax({
+            //        type: "POST", //表單method
+            //        url: "../SERVICES/WS_RBM_A01_C10.ashx?FCode=get_CONTRACT_DATE",
+            //        data:
+            //        {
+            //            PROJECT_SEQ_NO: PROJECT_SEQ_NO
+            //        },
+            //        complete: function (jqXhr, textStatus) {
+            //            var result = jQuery.parseJSON(jqXhr.responseText);
+            //            if (result.SRESULT == "TRUE") {
+            //                if (result.DATA != "") {
+            //                    $('#CONTRACT_BEGIN_DATE').data("kendoDatePicker").value(result.DATA[0].PROJECT_BEGIN_DATE);
+            //                    $('#CONTRACT_CONCLUDE_DATE').data("kendoDatePicker").value(result.DATA[0].PROJECT_END_DATE);
+            //                }
+            //            }
+            //        }
+            //    });
+            //}
+
+            function dateEditor(container, options) {
+                $('<input required data-text-field="' + options.field + '" data-value-field="' + options.field + '" data-bind="value:' + options.field + '"/>')
+                        .appendTo(container)
+                        .kendoDatePicker({ format: "yyyyMMdd", depth: "yyyyMMdd" });
+            }
+        });
+
+    </script>
+    <script id="popup-editor" type="text/x-kendo-tmpl">
+    <table class="edit-style">
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>計畫編號
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <input id="PROJECT_SEQ_NO_2" name="PROJECT_SEQ_NO_2" class='k-textbox' required validationMessage="請輸入"/>
+                <button id="btn_GET_PROJECT_SEQ_NO" class="k-button" type="button" >選擇計畫編號</button>
+                <div id="div_PROJECT_SEQ_NO" style="width:600px;"></div>
+            </td>
+        </tr>        
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                計畫主持人
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <div id="div_MEMBER_NAMEC"></div>
+            </td>
+        </tr>    
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>合作廠商名稱
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <input id="SUPPLIER_NAME" name="SUPPLIER_NAME" class='k-textbox' style="width:632px;" required validationMessage="請輸入" maxlength="25"/>
+                <button id="btn_GET_SUPPLIER" class="k-button" type="button" >選擇廠商資料</button>
+                <div id="div_SUPPLIER_ID"></div>
+            </td>
+        </tr>  
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>合作廠商統一編號
+            </td>
+            <td class="td-field-edit">
+                <input id="SUPPLIER_ID" name="SUPPLIER_ID" class='k-textbox' required validationMessage="請輸入"  maxlength="20" />
+            </td>
+            <td class="td-field-label">
+                合作廠商負責人姓名
+            </td>
+            <td class="td-field-edit">
+                <input id="SUPPLIER_DIRECTOR" name="SUPPLIER_DIRECTOR" class='k-textbox' maxlength="10" />
+            </td>
+        </tr> 
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                合作廠商聯絡人
+            </td>
+            <td class="td-field-edit">
+                <input id="SUPPLIER_CONTACT" name="SUPPLIER_CONTACT" class='k-textbox' maxlength="10" />        
+            </td>
+            <td class="td-field-label">
+                合作廠商電話
+            </td>
+            <td class="td-field-edit">
+                <input id="SUPPLIER_TEL" name="SUPPLIER_TEL" class='k-textbox' maxlength="15" />
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                合作廠商傳真電話
+            </td>
+            <td class="td-field-edit">
+                <input  name="SUPPLIER_FAX" class='k-textbox' maxlength="15" />
+            </td>
+            <td class="td-field-label">
+                合作廠商EMAIL
+            </td>
+            <td class="td-field-edit">
+                <input id="SUPPLIER_EMAIL" name="SUPPLIER_EMAIL" type="email" class='k-textbox' placeholder="e.g. myname@example.net" validationMessage="請輸入EMail格式" maxlength="30"/>
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                廠商合約狀態
+            </td>
+            <td class="td-field-edit">
+                <input id="CONTRACT_STATUS" name="CONTRACT_STATUS" data-bind="value:CONTRACT_STATUS" />
+            </td>
+            <td class="td-field-label">
+                合約簽訂起始日期
+            </td>
+            <td class="td-field-edit">
+                <input id="CONTRACT_BEGIN_DATE" name="CONTRACT_BEGIN_DATE" data-bind="value:CONTRACT_BEGIN_DATE" placeholder="yyyyMMdd"  maxlength="8"/> 
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                合約退款日期
+            </td>
+            <td class="td-field-edit">
+                <input  id="CONTRACT_REFUND_DATE" name="CONTRACT_REFUND_DATE" data-bind="value:CONTRACT_REFUND_DATE" placeholder="yyyyMMdd"  maxlength="8"/>
+            </td>
+            <td class="td-field-label">
+                合約結案日期
+            </td>
+            <td class="td-field-edit">
+                <input id="CONTRACT_CONCLUDE_DATE" name="CONTRACT_CONCLUDE_DATE" data-bind="value:CONTRACT_CONCLUDE_DATE" placeholder="yyyyMMdd"  maxlength="8"/>
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                合約廠商預算最低限額
+            </td>
+            <td class="td-field-edit">
+                <input id="CONTRACT_BUDGET_LIMIT" name="CONTRACT_BUDGET_LIMIT" data-bind="value:CONTRACT_BUDGET_LIMIT" maxlength="8"/>  
+            </td>
+            <td class="td-field-label">
+                低於預算最低限額<br/>
+                    是否自動EMAIL
+            </td>
+            <td class="td-field-edit">
+                <input type="checkbox" name="CONTRACT_AUTOMAIL_YN" data-bind="value:CONTRACT_AUTOMAIL_YN" >
+            </td>
+        </tr>     
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                合約新案試驗類別代碼
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <input id="TRIAL_CATEGORY" name="TRIAL_CATEGORY" data-bind="value:TRIAL_CATEGORY" />
+                <input name="TRIAL_CATEGORY_CONTENT" class='k-textbox' maxlength="50" />
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                藥品類別試驗階段代碼
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <input id="DRUG_LEVEL" name="DRUG_LEVEL" data-bind="value:DRUG_LEVEL" />
+                <input name="DRUG_LEVEL_CONTENT" class='k-textbox' />
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                計畫參與國家類型
+            </td>
+            <td class="td-field-edit">
+                <input id="NATIONAL_FLAG" name="NATIONAL_FLAG" data-bind="value:NATIONAL_FLAG" />
+            </td>
+            <td class="td-field-label">
+                 參與國家/醫院
+            </td>
+            <td class="td-field-edit">
+                <input name="COUNTRY_NAME" class='k-textbox' maxlength="50" />
+            </td>
+        </tr>  
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                台灣多中心<br/>
+                    總主持人服務機構
+            </td>
+            <td class="td-field-edit" colspan="3">
+                <input name="TAIWAN_DIRECTOR" class='k-textbox'  maxlength="20" />
+            </td>
+        </tr>    
+        <tr>
+            <td colspan="4" style="text-align:center">
+                <input type="checkbox" name="Check_YN" id="Check_YN" value="Y" checked="false" required validationMessage="請確認以上資料">
+                以上資料已確認無誤
+            </td>
+        </tr>
+    </table>         
+    </script>
+    <script id="popup-editor2" type="text/x-kendo-tmpl">
+    <table class="edit-style">
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>計畫編號
+            </td>
+            <td class="td-field-edit">
+                <input id="PROJECT_SEQ_NO_2" name="PROJECT_SEQ_NO_2" class='k-textbox' required validationMessage="請輸入"/>
+                <button id="btn_GET_PROJECT_SEQ_NO" class="k-button" type="button" >選擇計畫編號</button>
+                <div id="div_PROJECT_SEQ_NO"></div>
+            </td>
+        </tr>        
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>姓名
+            </td>
+            <td class="td-field-edit">
+                <input name="MEMBER_NAMEC" class='k-textbox' maxlength="12"  validationMessage="請輸入姓名" required/>
+            </td>
+        </tr>    
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>人員類型
+            </td>
+            <td class="td-field-edit">
+                <input name="MEMBER_KIND"  data-bind="value:MEMBER_KIND"  validationMessage="請選擇人員類型" required/>
+            </td>
+        </tr>  
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                院內人員卡號
+            </td>
+            <td class="td-field-edit">
+                <input name="MEMBER_CARD_NO" class='k-textbox' maxlength="8" /> <div style="color: Red">ps.如需使用此帳號登入此系統。請務必填寫此欄。</div>
+            </td>
+        </tr> 
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                每月薪資
+            </td>
+            <td class="td-field-edit">
+                <input name="SALARY_APPROVE_AMT" data-bind="value:SALARY_APPROVE_AMT"  maxlength="6"/>         
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                服務機構名稱
+            </td>
+            <td class="td-field-edit">
+                <input name="CUSTOMER_SERVICE" class='k-textbox' style="width:600px;" maxlength="50"/>
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>聯絡電話
+            </td>
+            <td class="td-field-edit">
+                <input name="MEMBER_TEL" class='k-textbox' maxlength="10" validationMessage="請輸入聯絡電話" required/>
+            </td>
+        </tr>   
+        <tr class="tr-row">  
+            <td class="td-field-label">
+                <span class="start">＊</span>EMAIL
+            </td>
+            <td class="td-field-edit">
+                <input name="MEMBER_EMAIL" class='k-textbox' style="width:600px;" type="email" placeholder="e.g. myname@example.net" maxlength="30" validationMessage="請輸入EMail格式" required/>
+            </td>
+        </tr>    
+    </table> 
+    </script>
+
+</asp:Content>
+<asp:Content ID="Content2" ContentPlaceHolderID="cphMain" runat="Server">
+    <div id="tabstrip">
+        <ul>
+            <li class="k-state-active">新增計畫
+            </li>
+            <li>新增臨床試驗資料
+            </li>
+            <li>新增計畫相關人員
+            </li>
+        </ul>
+        <div>
+            <table class="form" id="userform">
+                <tr>
+                    <th style="text-align: left; background-color: White;" colspan="4">
+                        <div style="color: Red">
+                            ※ 臨床試驗計畫，統一由臨床試驗中心負責人員輸入
+                        </div>
+                        &nbsp;計畫基本資料                        
+                    </th>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫類別：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="PROJECT_TYPESelect" name="PROJECT_TYPESelect" required validationmessage="請輸入" />
+                    </td>
+                    <th class="td-field-label">計畫子類別：</th>
+                    <td class="td-field-edit">
+                        <input id="PROJECT_CHILD_TYPE" style="width: 200px" class='k-textbox' maxlength="30" placeholder="請輸入經費來源機構名稱" />
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫編號：
+                    </th>
+                    <td class="td-field-edit" colspan="3" >
+                        <input id="PROJECT_IDText" name="PROJECT_IDText" style="width: 200px" class='k-textbox' maxlength="60" placeholder="計畫核定編號" /> <input id="PROJECT_ID_YEAR_Text" name="PROJECT_ID_YEAR_Text" style="width: 100px; display:none;" class="k-textbox" maxlength="1" placeholder="第幾年計畫" />
+                        <button id="CHECK_PROJECT_ID" class="k-primary" type="button">檢查是否已存在</button>
+                        <div id='div_CHECK_PROJECT_ID' style="display: none;">NONE</div>
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫中文名稱：
+                    </th>
+                    <td class="td-field-edit" colspan="3" >
+                        <input id="PROJECT_NAMECText" name="PROJECT_NAMECText" style="width: 90%" class='k-textbox' required validationmessage="請輸入" maxlength="150" />
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        計畫英文名稱：
+                    </th>
+                    <td class="td-field-edit" colspan="3">
+                        <input id="PROJECT_NAMEText" style="width: 90%" class='k-textbox' maxlength="200" />
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        計畫案件別：
+                    </th>
+                    <td class="td-field-edit" colspan="3">
+                        <input id="PROJECT_TYPE2Select" />
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫部門別：
+                    </th>
+                    <td class="td-field-edit" colspan="3">
+                        <input id="PROJECT_DEPARTSelect" name="PROJECT_DEPARTSelect" required validationmessage="請輸入" /></td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫執行年度(民國年)：
+                    </th>
+                    <td class="td-field-edit" colspan="3">
+                        <input id="BUDGET_YEARText" name="BUDGET_YEARText" type="text" style="width: 200px;" class='k-textbox' placeholder="請輸入民國年" required validationmessage="請輸入" maxlength="3" /></td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫主持人姓名：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="DIRECTOR_NAMEText" name="DIRECTOR_NAMEText" style="background-color: #cccccc" class='k-textbox' disabled="disabled" required validationmessage="請輸入" />&nbsp;
+                        <button id="btn_GET_DIRECTOR_NAME" class="k-button" type="button">選擇計畫主持人</button>
+                    </td>
+                    <th class="td-field-label">
+                        <span class="start">＊</span>每月主持費：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="SALARY_APPROVE_AMTCASHText" name="SALARY_APPROVE_AMTCASHText" required validationmessage="請輸入" value="0" maxlength="6"/>
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>計畫執行開始日：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="PROJECT_BEGIN_DatePicker" name="PROJECT_BEGIN_DatePicker" placeholder="yyyyMMdd" pattern="\d{4}\d{1,2}\d{1,2}" required validationmessage="請輸入西元年日期yyyyMMdd" maxlength="8"/>
+                    </td>
+                    <th style="text-align: right; color: white"><span class="start">＊</span>計畫執行結束日：</th>
+                    <td class="td-field-edit">
+                        <input id="PROJECT_END_DatePicker" name="PROJECT_END_DatePicker" placeholder="yyyyMMdd" pattern="\d{4}\d{1,2}\d{1,2}" required validationmessage="請輸入西元年日期yyyyMMdd" maxlength="8"/>
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        總計畫編號：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="MASTER_PROJECT_IDText" name="MASTER_PROJECT_IDText" style="width: 200px" class='k-textbox' maxlength="50" />
+                    </td>
+                    <th style="text-align: right; color: white">IRB審核通過編號：</th>
+                    <td class="td-field-edit">
+                        <input id="IRB_NOText" name="IRB_NOText" style="width: 200px" class='k-textbox' maxlength="30" />
+                    </td>
+                </tr>
+                <tr>
+                    <th style="text-align: left; background-color: White;" colspan="4">經費設定</th>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        <span class="start">＊</span>撥款類型：
+                    </th>
+                    <td class="td-field-edit">
+                        <input id="INCOME_TYPESelect" />
+                    </td>
+                    <th style="text-align: right; color: white">憑證抽報：</th>
+                    <td class="td-field-edit">
+                        <input type="checkbox" class='form-control trchkbox' id="PAPER_YNCheck" />
+                    </td>
+                </tr>
+                <tr class="tr-row">
+                    <th class="td-field-label">
+                        備註：
+                    </th>
+                    <td class="td-field-edit" colspan="3">
+                        <textarea id="REMARK" class="k-textbox" style="width: 600px;" cols="20" rows="5" maxlength="50"></textarea>
+                    </td>
+                </tr>
+            </table>
+            <div id="step1_div" style="text-align: center; margin-top: 20px;">
+                <button id="btn_next" class="k-primary" type="button">下一步</button>
+                <div id="dialog-confirm"></div>
+            </div>
+            <div id="BUDGET_div" style="display: none;">
+                <div id="BUDGET_Grid"></div>
+                <div id="step2_div" style="text-align: center; margin-top: 20px;">
+                    <button id="btn_back" class="k-button" type="button">回上一步</button>
+                    <button id="btn_send" class="k-primary" type="button">完成新增</button>
+                </div>
+            </div>
+        </div>
+        <div>
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td colspan="5">
+                        <div class="row" style="margin-left: 0px; margin-right: 0px;">
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">計畫編號</span>
+                                <input type="text" id="PROJECT_SEQ_NO_Sel_2" />
+                            </div>
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">計畫編號</span>
+                                <input type="text" id="PROJECT_ID_Text_2" class="k-textbox" />
+                            </div>
+                        </div>
+                        <div class="row" style="margin-left: 0px; margin-right: 0px;">
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">廠商名稱</span>
+                                <input type="text" id="SUPPLIER_NAME_Text_2" class="k-textbox" />
+                            </div>
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">統一編號</span>
+                                <input type="text" id="SUPPLIER_ID_Text_2" class="k-textbox" />
+                            </div>
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="margin-left: 10px; margin-top: 2px;">
+                                <button id="QueryButton_SUPPLIER" class="k-primary " type="button">查詢</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <div id="SUPPLIER_Grid"></div>
+        </div>
+        <div>
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td colspan="5">
+                        <div class="row" style="margin-left: 0px; margin-right: 0px;">
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">計畫編號</span>
+                                <input type="text" id="PROJECT_SEQ_NO_Sel_3" />
+                            </div>
+                        </div>
+                        <div class="row" style="margin-left: 0px; margin-right: 0px;">
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">姓名</span>
+                                <input type="text" id="MEMBER_NAMEC_Text" class="k-textbox" />
+                            </div>
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                                <span class="input-group-addon">卡號</span>
+                                <input type="text" id="MEMBER_CARD_NO_Text" class="k-textbox" />
+                            </div>
+                            <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="margin-left: 10px; margin-top: 2px;">
+                                <button id="QueryButton_PROJECT_HR" class="k-primary " type="button">查詢</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <div id="PROJECT_HR_Grid"></div>
+        </div>
+
+        <%--以下程式碼為 WINDOW 視窗--%>
+        <div id="window">
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td>計畫編號是否確定為空白？ 如果計畫編號為空白，系統將自動編號。
+                    </td>
+                </tr>
+            </table>
+            <div style="text-align: center">
+                <button id="btn_Y" class="k-primary" type="button">確定</button>
+                <button id="btn_N" class="k-button" type="button">返回修改</button>
+            </div>
+        </div>
+
+        <div id="DIRECTOR_NAME_DIV">
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td colspan="5">
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">姓名</span>
+                            <input id="NAMEC" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">卡號</span>
+                            <input id="CARDNO" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="margin-left: 10px; margin-top: 2px;">
+                            <button id="QueryButton_DIRECTOR_NAME" class="k-primary" type="button">查詢</button>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <br />
+            <div id="DIRECTOR_NAME_Grid"></div>
+        </div>
+
+        
+        <div id="div_completemsg">
+            <br />
+            計畫紙本文(含<u><b>預算表、核定公文</b></u>)，請送<%--「<b>醫學研究部</b>」及--%>「<b>主計室預算組</b>」<%--各--%>一份，以利審查。<br />
+            <br />
+            業務承辦人員<br />
+            <%--醫學研究部　　------　鄭惠月(分機：4001)<br/>--%>
+            主計室預算組　------　王麗卿(電話：2712)<br />
+        </div>
+
+        <div id="INV_SUPPLIER_DIV">
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td colspan="5">
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">廠商名稱</span>
+                            <input id="SUPPLIER_NAME_Text" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="margin-left: 10px; margin-top: 2px;">
+                            <button id="QueryButton_INV_SUPPLIER" class="k-primary" type="button">查詢</button>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <br />
+            <div id="INV_SUPPLIER_Grid"></div>
+        </div>
+
+        <div id="PROJECT_SEQ_NO_DIV">
+            <table class="table" style="width: 100%">
+                <tr>
+                    <td colspan="5">
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">計畫編號</span>
+                            <input id="PROJECT_ID_Text" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">計畫名稱</span>
+                            <input id="PROJECT_NAMEC_Text" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left">
+                            <span class="input-group-addon">主持人</span>
+                            <input id="DIRECTOR_NAME_Text" style="width: 150px" class='k-textbox' />
+                        </div>
+                        <div class="input-group col-lg-3 col-md-3 col-sm-3 pull-left" style="margin-left: 10px; margin-top: 2px;">
+                            <button id="QueryButton_PROJECT_SEQ_NO" class="k-primary" type="button">查詢</button>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <br />
+            <div id="PROJECT_SEQ_NO_Grid"></div>
+        </div>
+    </div>
+</asp:Content>
+
+

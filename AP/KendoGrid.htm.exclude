@@ -1,0 +1,151 @@
+<html lang="zh"><head><!-- meta ignored --><meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+<link rel="stylesheet" type="text/css" href="skins/larry/embed.min.css?s=1463915207">
+<script type="text/javascript">
+/* <![CDATA[ */
+
+
+/* ]]> */
+</script>
+
+</head>
+<!-- script not allowed -->
+<!-- script not allowed --><body><p>
+//==================================================================
+//
+//                          export   
+//
+//==================================================================
+
+http://jsfiddle.net/TheSharpieOne/XNVj3/1/
+
+//<!-- script not allowed -->
+$(&quot;#export&quot;).kendoButton({
+	spriteCssClass: &quot;&quot;,
+	click: function (e) {
+		var blob = new Blob([document.getElementById('ListGrid').innerHTML], {
+			type: &quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8&quot;
+		});
+		saveAs(blob, &quot;Report.xls&quot;);
+	}
+});
+<button id="export" class="k-button" type="button">export</button>
+
+
+<!-- script not allowed -->
+<!-- script not allowed -->
+<!-- script not allowed -->
+
+
+</p>
+	<table class="form" id="userform">          
+		<tr>
+			<th style="text-align: left; background-color: White" colspan="4">
+				<div style="color: Red">
+					※ 臨床試驗計畫，統一由臨床試驗中心負責人員輸入
+				</div>
+				 計畫基本資料                        
+			</th>
+		</tr>     
+		<tr>
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫編號：</th>
+			<td colspan="3">
+				<input id="PROJECT_IDText" name="PROJECT_IDText" style="width: 200px" class="k-textbox" />                      
+			</td> 
+
+		</tr> 
+		<tr>
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫中文名稱：</th>
+			<td colspan="3">
+				<input id="PROJECT_NAMECText" name="PROJECT_NAMECText" style="width: 90%" class="k-textbox" />
+			</td>
+		</tr> 
+		<tr>
+			<th style="text-align: right; color: white">計畫英文名稱：</th>
+			<td colspan="3">
+				<input id="PROJECT_NAMEText" style="width: 90%" class="k-textbox" />                   
+			</td>   
+		</tr>
+		<tr>                
+		<th style="text-align: right; color: white"><span class="start">＊</span>計畫類別：</th>
+			<td>
+				<input id="PROJECT_TYPESelect" name="PROJECT_TYPESelect" class="form-control" />
+			</td>
+			<th style="text-align: right; color: white">計畫子類別：</th>
+			<td>
+				<input id="PROJECT_CHILD_TYPE" style="width: 200px" class="k-textbox" />
+			</td>                  
+		</tr>   
+		<tr>                  
+			<th style="text-align: right; color: white">計畫案件別：</th>
+			<td colspan="3">
+				<input id="PROJECT_TYPE2Select" />
+			</td>
+		</tr>
+		<tr>                  
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫部門別：</th>
+			<td colspan="3">
+				<input id="PROJECT_DEPARTSelect" name="PROJECT_DEPARTSelect" /></td>
+		</tr>
+		<tr>                  
+			<th style="text-align: right; color: white"><span class="start">＊</span>收案年度：</th>
+			<td colspan="3">
+				<input id="BUDGET_YEARText" name="BUDGET_YEARText" type="text" style="width: 200px" class="k-textbox" /></td>
+		</tr>
+		<tr>                  
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫主持人姓名：</th>
+			<td>
+				<input id="DIRECTOR_NAMEText" name="DIRECTOR_NAMEText" style="background-color: #cccccc" class="k-textbox" disabled="disabled" /> 
+				<button id="btn_GET_DIRECTOR_NAME" class="k-button" type="button">選擇計畫主持人</button>
+			</td>
+			<th style="text-align: right; color: white"><span class="start">＊</span>每月主持費：</th>
+			<td>
+				<input id="SALARY_APPROVE_AMTCASHText" name="SALARY_APPROVE_AMTCASHText" value="0" />
+			</td>   
+		</tr>
+		<tr>                
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫執行開始日：</th>
+			<td>
+				<input id="PROJECT_BEGIN_DatePicker" name="PROJECT_BEGIN_DatePicker" />
+			</td>
+			<th style="text-align: right; color: white"><span class="start">＊</span>計畫執行結束日：</th>
+			<td>
+				<input id="PROJECT_END_DatePicker" name="PROJECT_END_DatePicker" />
+			</td>                  
+		</tr>
+		<tr>
+			<th style="text-align: right; color: white">總計畫編號：</th>
+			<td>
+				<input id="MASTER_PROJECT_IDText" name="MASTER_PROJECT_IDText" style="width: 200px" class="k-textbox" />                      
+			</td> 
+			<th style="text-align: right; color: white">IRB審核通過編號：</th>
+			<td>
+				<input id="IRB_NOText" name="IRB_NOText" style="width: 200px" class="k-textbox" />                      
+			</td> 
+		</tr> 
+		<tr>
+			<th style="text-align: left; background-color: White" colspan="4">經費設定</th>
+		</tr> 
+		<tr>
+			<th style="text-align: right; color: white"><span class="start">＊</span>撥款類型：</th>
+			<td>
+				<input id="INCOME_TYPESelect" />
+			</td>     
+			<th style="text-align: right; color: white">憑證抽報：</th>
+			<td>
+				<input type="checkbox" id="PAPER_YNCheck" />
+			</td>               
+		</tr>
+		<tr>
+			<th style="text-align: right; color: white">備註：</th>
+			<td colspan="3">
+				<textarea id="REMARK" class="k-textbox" style="width: 600px" cols="20" rows="5"></textarea>
+			</td>
+		</tr>
+	</table>
+
+	<div style="text-align: center; margin-top: 20px">
+		<button id="btn_BACK" class="k-primary" type="button" style="text-align: center">確定</button>
+	</div>
+
+
+</body></html>

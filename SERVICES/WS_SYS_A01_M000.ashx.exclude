@@ -1,0 +1,296 @@
+﻿/*
+WS_SYS_A01_M000
+
+Description : mgtcode維護
+Create By :潘姿均
+Create Date :20151105
+*/
+
+<%@ WebHandler Language="C#" Class="WS_SYS_A01_M000" %>
+
+using System;
+using System.Web;
+using System.Data;
+using System.Text;
+using System.Web.SessionState;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
+using dmxUtils;
+using dmxUserInterface;
+using dmxDataAccess;
+using System.Linq;
+using System.Reflection;
+
+public class WS_SYS_A01_M000 : uiAshxCommon
+{
+    public override void ProcessRequest(HttpContext context)
+    {
+        base.ProgramID = "A01M000";
+        base.ProcessRequest(context);
+        // 設定回傳頁面型態
+        context.Response.ContentType = "application/json";
+        WebParamaters WPS = new WebParamaters();
+        JavaScriptSerializer js = new JavaScriptSerializer() { MaxJsonLength = Int32.MaxValue };
+        // 設定回傳資料集
+        Dictionary<string, object> dicResult = new Dictionary<string, object>();
+        List<object> listResult = new List<object>();
+        StringBuilder sbSQL = new StringBuilder();
+        DataTable dtTable = new DataTable();
+        string sFCode = WPS.getKeys("FCode");
+
+        //判斷登入連線session是否存在
+        if (base.sUserID != "" && base.sUserNM != "")
+        {
+            //hissp1連線
+            using (OracleDataSource OraDB = new OracleDataSource("VGHTC.MEM.ConnStr", true))
+            {
+                try
+                {
+                    GetBaseCode gbc = new GetBaseCode();
+                    List<string> ListSELECT = new List<string>();
+                    DBQuery Query = new DBQuery();
+                    DBConnector conn = new DBConnector();
+                    List<DBItem> ITEM = new List<DBItem>();
+                    List<string> ListWHERE = new List<string>();
+
+                    //SELECT 代碼轉換值
+                    switch (sFCode)
+                    {
+                        case "R":
+                            {
+                                string sSYSCODETYPE = Utils.StrEmpty(context.Request["SyscodeType"]);
+                                string sSYSCODENM = Utils.StrEmpty(context.Request["SyscodeNM"]);
+                                var models = js.Deserialize<Constant.JSON_PAGE>(WPS.getKeys("models"));
+
+                                #region 查詢條件
+                                ListWHERE = new List<string>();
+                                ListWHERE.Add("SystemID =" + conn.Qt(base.sSystemID));
+                                if (!sSYSCODETYPE.Equals(""))
+                                {
+                                    ListWHERE.Add("SyscodeType =" + conn.Qt(sSYSCODETYPE));
+                                }
+                                if (!sSYSCODENM.Equals(""))
+                                {
+                                    ListWHERE.Add("SyscodeNM like " + conn.Qt("%" + sSYSCODENM + "%"));
+                                }
+                                #endregion
+
+                                #region 查詢資料集
+                                ListSELECT = new List<string>();
+                                ListSELECT.Add("SystemID");
+                                ListSELECT.Add("SyscodeType");
+                                ListSELECT.Add("SyscodeNM");
+                                ListSELECT.Add("PROCDATETIME");
+                                ListSELECT.Add("PROCID");
+                                ListSELECT.Add("PROCNMC");
+                                ListSELECT.Add("CREATEDATETIME");
+                                ListSELECT.Add("CREATEID");
+                                ListSELECT.Add("CREATENMC");
+                                ListSELECT.Add("SyscodeLength");
+                                #endregion
+                                dtTable = Query.DBExecQuery("MGT.MGTCODM", ListSELECT, ListWHERE, "SyscodeType ASC", DBQuery.DBQueryType.Paging, models, OraDB);
+
+                                foreach (DataRow dr in dtTable.Rows)
+                                {
+                                    listResult.Add(new JSONMGTCODE.MGTCODM()
+                                    {
+                                        SystemID = dr["SystemID"].ToString(),
+                                        SyscodeType = dr["SyscodeType"].ToString(),
+                                        SyscodeNM = dr["SyscodeNM"].ToString(),
+                                        PROCDATETIME = dr["PROCDATETIME"].ToString(),
+                                        PROCID = dr["PROCID"].ToString(),
+                                        PROCNMC = dr["PROCNMC"].ToString(),
+                                        CREATEDATETIME = dr["CREATEDATETIME"].ToString(),
+                                        CREATEID = dr["CREATEID"].ToString(),
+                                        CREATENMC = dr["CREATENMC"].ToString(),
+                                        SyscodeLength = dr["SyscodeLength"].ToString()
+                                    });
+                                }
+
+                                //取得總筆數
+                                dicResult.Add("TOTALCOUNT", Query.DBExecQueryCount("MGT.MGTCODM", ListWHERE, OraDB));
+
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "");
+                                dicResult.Add("DATA", listResult);
+                                break;
+                            }
+                        case "U":
+                            {
+                                var models = js.Deserialize<JSONMGTCODE.MGTCODM>(WPS.getKeys("models"));
+
+                                ITEM = new List<DBItem>();
+                                ITEM.Add(new DBItem("SyscodeNM", models.SyscodeNM, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("SyscodeLength", models.SyscodeLength, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("PROCDATETIME", null, DBItem.DBDataType.DateTime));
+                                ITEM.Add(new DBItem("PROCID", base.sUserID, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("PROCNMC", base.sUserNM, DBItem.DBDataType.String));
+                                ListWHERE = new List<string>();
+                                ListWHERE.Add("SystemID =" + conn.Qt(base.sSystemID));
+                                ListWHERE.Add("SyscodeType =" + conn.Qt(models.SyscodeType));
+                                conn.DBExecUpdate("MGT.MGTCODM", ITEM, ListWHERE, OraDB);
+
+                                //先刪除
+                                conn.DBExecDelete("MGT.MGTCODE", ListWHERE, DBConnector.DBDeleteType.Delete, OraDB);
+
+                                //後新增
+                                for (int i = 0; i < models.MGTCODE.Count; i++)
+                                {
+                                    ITEM = new List<DBItem>();
+                                    ITEM.Add(new DBItem("SystemID", base.sSystemID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("SyscodeType", models.SyscodeType, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCode", models.MGTCODE[i].MGTSysCode, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCodeNM", models.MGTCODE[i].MGTSysCodeNM, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCodeNME", models.MGTCODE[i].MGTSysCodeNME, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("DisplaySort", models.MGTCODE[i].DisplaySort, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTCodeMemo", models.MGTCODE[i].MGTCodeMemo, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("PROCDATETIME", null, DBItem.DBDataType.DateTime));
+                                    ITEM.Add(new DBItem("PROCID", base.sUserID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("PROCNMC", base.sUserNM, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("CREATEDATETIME", null, DBItem.DBDataType.DateTime));
+                                    ITEM.Add(new DBItem("CREATEID", base.sUserID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("CREATENMC", base.sUserNM, DBItem.DBDataType.String));
+                                    conn.DBExecInsert("MGT.MGTCODE", ITEM, OraDB);
+                                }
+
+                                OraDB.transaction.Commit();
+
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "更新成功");
+                                break;
+                            }
+                        case "C":
+                            {
+                                var models = js.Deserialize<JSONMGTCODE.MGTCODM>(WPS.getKeys("models"));
+
+                                ITEM = new List<DBItem>();
+                                ITEM.Add(new DBItem("SystemID", base.sSystemID, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("SyscodeType", models.SyscodeType, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("SyscodeNM", models.SyscodeNM, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("PROCDATETIME", null, DBItem.DBDataType.DateTime));
+                                ITEM.Add(new DBItem("PROCID", base.sUserID, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("PROCNMC", base.sUserNM, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("CREATEDATETIME", null, DBItem.DBDataType.DateTime));
+                                ITEM.Add(new DBItem("CREATEID", base.sUserID, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("CREATENMC", base.sUserNM, DBItem.DBDataType.String));
+                                ITEM.Add(new DBItem("SyscodeLength", models.SyscodeLength, DBItem.DBDataType.String));
+                                conn.DBExecInsert("MGT.MGTCODM", ITEM, OraDB);
+
+                                for (int i = 0; i < models.MGTCODE.Count; i++)
+                                {
+                                    ITEM = new List<DBItem>();
+                                    ITEM.Add(new DBItem("SystemID", base.sSystemID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("SyscodeType", models.SyscodeType, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCode", models.MGTCODE[i].MGTSysCode, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCodeNM", models.MGTCODE[i].MGTSysCodeNM, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTSysCodeNME", models.MGTCODE[i].MGTSysCodeNME, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("DisplaySort", models.MGTCODE[i].DisplaySort, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("MGTCodeMemo", models.MGTCODE[i].MGTCodeMemo, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("PROCDATETIME", null, DBItem.DBDataType.DateTime));
+                                    ITEM.Add(new DBItem("PROCID", base.sUserID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("PROCNMC", base.sUserNM, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("CREATEDATETIME", null, DBItem.DBDataType.DateTime));
+                                    ITEM.Add(new DBItem("CREATEID", base.sUserID, DBItem.DBDataType.String));
+                                    ITEM.Add(new DBItem("CREATENMC", base.sUserNM, DBItem.DBDataType.String));
+                                    conn.DBExecInsert("MGT.MGTCODE", ITEM, OraDB);
+                                }
+
+                                OraDB.transaction.Commit();
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "新增成功");
+                                break;
+                            }
+
+                        case "RDetail":
+                            {
+                                string sSYSCODETYPE = Utils.StrEmpty(context.Request["SyscodeType"]);
+
+                                var models = js.Deserialize<Constant.JSON_PAGE>(WPS.getKeys("models"));
+
+                                #region 查詢條件
+                                ListWHERE = new List<string>();
+                                ListWHERE.Add("CancelYN = 'N'");
+                                ListWHERE.Add("SystemID =" + conn.Qt(base.sSystemID));
+
+                                if (!sSYSCODETYPE.Equals(""))
+                                {
+                                    ListWHERE.Add("SyscodeType =" + conn.Qt(sSYSCODETYPE));
+                                }
+                                #endregion
+
+                                #region 查詢資料集
+                                ListSELECT = new List<string>();
+                                ListSELECT.Add("SystemID");
+                                ListSELECT.Add("SyscodeType");
+                                ListSELECT.Add("MGTSysCode");
+                                ListSELECT.Add("MGTSysCodeNM");
+                                ListSELECT.Add("MGTSysCodeNME");
+                                ListSELECT.Add("DisplaySort");
+                                ListSELECT.Add("MGTCodeMemo");
+                                #endregion
+                                dtTable = Query.DBExecQuery("MGT.MGTCODE", ListSELECT, ListWHERE, "SyscodeType ASC, DisplaySort ASC", DBQuery.DBQueryType.normal, models, OraDB);
+
+                                foreach (DataRow dr in dtTable.Rows)
+                                {
+                                    listResult.Add(new JSONMGTCODE.MGTCODE()
+                                    {
+                                        SystemID = dr["SystemID"].ToString(),
+                                        SyscodeType = dr["SyscodeType"].ToString(),
+                                        MGTSysCode = dr["MGTSysCode"].ToString(),
+                                        MGTSysCodeNM = dr["MGTSysCodeNM"].ToString(),
+                                        MGTSysCodeNME = dr["MGTSysCodeNME"].ToString(),
+                                        DisplaySort = dr["DisplaySort"].ToString(),
+                                        MGTCodeMemo = dr["MGTCodeMemo"].ToString()
+                                    });
+                                }
+
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "");
+                                dicResult.Add("DATA", listResult);
+                                break;
+                            }
+                        case "GET_SYSCODETYPE":
+                            {
+                                ListWHERE.Add("SystemID = " + conn.Qt(base.sSystemID));
+                                string sSYSCODETYPE = gbc.GetSeqNo(null, "MGT.MGTCODM", "SyscodeType", ListWHERE, 0, 2, OraDB);
+
+                                dicResult.Add("SRESULT", "TRUE");
+                                dicResult.Add("SMESSAGE", "");
+                                dicResult.Add("DATA", sSYSCODETYPE);
+                                break;
+                            }
+                        default:
+                            break;
+
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string content = "操作者卡號：" + base.sUserID + @"<br/>
+                                      操作者：" + base.sUserNM + @"<br/>
+                                      FCode：" + sFCode + @"<br/>
+                                      錯誤例外訊息：" + ex.Message + @"<br/>                                        
+                                      錯誤SQL：" + OraDB.SQL + @"<br/>                                       
+                                      錯誤SQL訊息：" + OraDB.Message + @"<br/>";
+
+                    Utility ut = new Utility();
+                    ut.SendMail("cc4f@vghtc.gov.tw", "melodypan@vghtc.gov.tw", "程式錯誤_" + base.sSystemID + "_" + base.ProgramID, content);
+                    ErrorLogger ErrLog = new ErrorLogger(base.ProgramID, OraDB.SQL, OraDB.Message);
+                    dicResult.Add("SRESULT", "FALSE");
+                    dicResult.Add("SMESSAGE", ex.Message);
+                }
+            }
+        }
+        string strJSON = js.Serialize(dicResult);
+        context.Response.Write(strJSON);
+        context.Response.End();
+    }
+
+    public override bool IsReusable
+    {
+        get
+        {
+            return false;
+        }
+    }
+}
